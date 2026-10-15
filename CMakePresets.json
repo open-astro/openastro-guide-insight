@@ -36,6 +36,24 @@
       }
     },
     {
+      "name": "asan",
+      "displayName": "Debug build with AddressSanitizer and UndefinedBehaviorSanitizer",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "PHDLOGVIEW_WERROR": "ON"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
       "name": "linux",
       "displayName": "Linux release using system packages",
       "inherits": "base",
@@ -105,6 +123,10 @@
       "configurePreset": "dev"
     },
     {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
       "name": "linux",
       "configurePreset": "linux"
     },
@@ -127,6 +149,13 @@
     {
       "name": "dev",
       "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
       "output": {
         "outputOnFailure": true
       }

@@ -40,28 +40,31 @@ static std::string XALGO("X guide algorithm = ");
 static std::string YALGO("Y guide algorithm = ");
 static std::string MINMOVE("Minimum move = ");
 
-static char *nstrtok(char *str, const char *delims)
+// Splits a writable buffer on delimiters in place. Unlike strtok, an empty
+// field between two delimiters is returned as "", and a trailing field with
+// no delimiter after it is not returned (callers add sentinel delimiters).
+class Tokenizer
 {
-    static char *src;
+    char *m_src;
 
-    if (str)
-        src = str;
+public:
+    explicit Tokenizer(char *str) : m_src(str) { }
 
-    if (!src)
-        return 0;
-
-    char *p;
-    char *ret = 0;
-
-    if ((p = strpbrk(src, delims)) != 0)
+    char *Next(const char *delims)
     {
-        *p = 0;
-        ret = src;
-        src = p + 1;
-    }
+        if (!m_src)
+            return nullptr;
 
-    return ret;
-}
+        char *p = strpbrk(m_src, delims);
+        if (!p)
+            return nullptr;
+
+        *p = 0;
+        char *ret = m_src;
+        m_src = p + 1;
+        return ret;
+    }
+};
 
 inline static bool toLong(const char *s, long *p)
 {
@@ -116,15 +119,17 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     long l;
     double d;
 
-    s = nstrtok(buf, ",");
+    Tokenizer tok(buf);
+
+    s = tok.Next(",");
     if (!toLong(s, &l)) return false;
     e.frame = l;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (!toDouble(s, &d)) return false;
     e.dt = (float)d;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (strcmp(s, "\"Mount\"") == 0)
         e.mount = MOUNT;
     else if (strcmp(s, "\"AO\"") == 0)
@@ -135,7 +140,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
         e.mount = MOUNT;
     }
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -143,7 +148,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.dx = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -151,7 +156,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.dy = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -159,7 +164,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.raraw = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -167,7 +172,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.decraw = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -175,7 +180,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.raguide = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -183,7 +188,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.decguide = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
@@ -191,7 +196,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.radur = 0;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (s[0] == 'E')
@@ -202,7 +207,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
             return false;
     }
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
@@ -210,7 +215,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.decdur = 0;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (*s == 'N')
@@ -222,7 +227,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
 
     // x step
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
@@ -230,14 +235,14 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
 
     // y step
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
         e.decdur = l;
     }
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
@@ -245,7 +250,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.mass = 0;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toDouble(s, &d)) return false;
@@ -253,7 +258,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.snr = 0.f;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         if (!toLong(s, &l)) return false;
@@ -261,7 +266,7 @@ static bool ParseEntry(const std::string& ln, GuideEntry& e)
     }
     else e.err = 0;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (s && *s)
     {
         e.info = s;
@@ -405,7 +410,9 @@ static bool ParseCalibration(const std::string& ln, CalibrationEntry& e)
     long l;
     double d;
 
-    s = nstrtok(buf, ",");
+    Tokenizer tok(buf);
+
+    s = tok.Next(",");
     if (strcmp(s, "West") == 0 || strcmp(s, "Left") == 0)
         e.direction = WEST;
     else if (strcmp(s, "East") == 0)
@@ -419,15 +426,15 @@ static bool ParseCalibration(const std::string& ln, CalibrationEntry& e)
     else
         return false;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (!toLong(s, &l)) return false;
     e.step = l;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (!toDouble(s, &d)) return false;
     e.dx = d;
 
-    s = nstrtok(0, ",");
+    s = tok.Next(",");
     if (!toDouble(s, &d)) return false;
     e.dy = d;
 
@@ -530,7 +537,7 @@ bool LogParser::Parse(std::istream& is, GuideLog& log)
     enum State { SKIP, GUIDING_HDR, GUIDING, CAL_HDR, CALIBRATING, };
     State st = SKIP;
     enum HdrState { GLOBAL, AO, MOUNT, };
-    HdrState hdrst;
+    HdrState hdrst = GLOBAL;
     char axis = ' ';
     GuideSession *s = 0;
     Calibration *cal = 0;

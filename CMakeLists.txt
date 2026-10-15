@@ -47,6 +47,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 #################################################################################
+# Compiler warnings, applied to this project's targets only
+
+option(PHDLOGVIEW_WERROR "Treat compiler warnings as errors" OFF)
+
+function(phdlogview_warnings target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4)
+    if(PHDLOGVIEW_WERROR)
+      target_compile_options(${target} PRIVATE /WX)
+    endif()
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra)
+    if(PHDLOGVIEW_WERROR)
+      target_compile_options(${target} PRIVATE -Werror)
+    endif()
+  endif()
+endfunction()
+
+#################################################################################
 # Dependencies
 #
 # Windows and macOS release builds get wxWidgets and GSL from the vcpkg
@@ -112,6 +131,7 @@ add_library(phdlogview_core STATIC
 target_include_directories(phdlogview_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(phdlogview_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
 target_link_libraries(phdlogview_core PUBLIC ${PHDLOGVIEW_WX_LIBS} GSL::gsl GSL::gslcblas)
+phdlogview_warnings(phdlogview_core)
 if(MSVC)
   target_compile_definitions(phdlogview_core PUBLIC _CRT_SECURE_NO_WARNINGS)
   target_compile_options(phdlogview_core PUBLIC /utf-8)
@@ -134,6 +154,7 @@ add_executable(phdlogview WIN32 MACOSX_BUNDLE ${SRC} ${FBSRC})
 
 target_include_directories(phdlogview PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(phdlogview PRIVATE phdlogview_core)
+phdlogview_warnings(phdlogview)
 
 if(APPLE)
   set_target_properties(phdlogview PROPERTIES
