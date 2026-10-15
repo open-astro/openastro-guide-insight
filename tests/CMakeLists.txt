@@ -25,3 +25,12 @@ if(TARGET Catch2::Catch2 AND NOT COMMAND catch_discover_tests)
 endif()
 include(Catch)
 catch_discover_tests(phdlogview_tests DISCOVERY_MODE PRE_TEST)
+
+# Build policy checks for the macOS app bundle: native Apple Silicon only,
+# and the supported minimum macOS version.
+if(APPLE)
+  add_test(NAME macos_app_is_arm64_only
+    COMMAND sh -c "test \"$(lipo -archs \"$1\")\" = arm64" _ $<TARGET_FILE:phdlogview>)
+  add_test(NAME macos_app_minimum_is_26
+    COMMAND sh -c "vtool -show-build \"$1\" | grep -q -E 'minos 26\\.0$'" _ $<TARGET_FILE:phdlogview>)
+endif()
