@@ -28,8 +28,11 @@ echo "$sha512  $work/wx.tar.gz" | sha512sum -c -
 mkdir "$work/src"
 tar -xzf "$work/wx.tar.gz" -C "$work/src" --strip-components=1
 
-# Static libraries with bundled third-party code, and only what phdlogview
-# needs, so the result has few runtime dependencies beyond GTK.
+# Static wxWidgets libraries with only what phdlogview needs. GitHub's source
+# archive omits wxWidgets' bundled third-party submodules, so image, regex,
+# zlib and XML support come from system packages (libpcre2-dev, zlib1g-dev,
+# libpng-dev, libjpeg-dev, libtiff-dev, libexpat1-dev). NanoSVG is only
+# available bundled, and phdlogview does not use SVG, so it is off.
 cmake -S "$work/src" -B "$work/build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$prefix" \
@@ -37,9 +40,9 @@ cmake -S "$work/src" -B "$work/build" -G Ninja \
   -DwxBUILD_SHARED=OFF \
   -DwxBUILD_TOOLKIT=gtk3 \
   -DwxBUILD_SAMPLES=OFF -DwxBUILD_TESTS=OFF -DwxBUILD_DEMOS=OFF \
-  -DwxUSE_REGEX=builtin -DwxUSE_ZLIB=builtin -DwxUSE_EXPAT=builtin \
-  -DwxUSE_LIBPNG=builtin -DwxUSE_LIBJPEG=builtin -DwxUSE_LIBTIFF=builtin \
-  -DwxUSE_NANOSVG=builtin \
+  -DwxUSE_REGEX=sys -DwxUSE_ZLIB=sys -DwxUSE_EXPAT=sys \
+  -DwxUSE_LIBPNG=sys -DwxUSE_LIBJPEG=sys -DwxUSE_LIBTIFF=sys \
+  -DwxUSE_NANOSVG=OFF \
   -DwxUSE_OPENGL=OFF -DwxUSE_WEBVIEW=OFF -DwxUSE_MEDIACTRL=OFF \
   -DwxUSE_LIBSDL=OFF -DwxUSE_SECRETSTORE=OFF -DwxUSE_STC=OFF
 cmake --build "$work/build"
