@@ -14,6 +14,7 @@ add_executable(phdlogview_tests
   main.cpp
   test_logparser.cpp
   test_analysis.cpp
+  test_build.cpp
 )
 target_link_libraries(phdlogview_tests PRIVATE phdlogview_core Catch2::Catch2)
 target_compile_definitions(phdlogview_tests PRIVATE
