@@ -26,7 +26,7 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -36,7 +36,7 @@ jobs:
       # Ubuntu packages an older wxWidgets 3.2, so build the pinned release.
       - name: Restore wxWidgets build
         id: wx-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/wx
           key: wx-${{ matrix.runner }}-${{ hashFiles('vcpkg-ports/wxwidgets/vcpkg.json', 'vcpkg-ports/wxwidgets/portfile.cmake', 'scripts/build-wxwidgets.sh') }}
@@ -64,7 +64,7 @@ jobs:
       - name: Package artifact
         run: tar -C stage -czf phdlogview-linux-${{ matrix.arch }}.tar.gz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: phdlogview-linux-${{ matrix.arch }}
           path: phdlogview-linux-${{ matrix.arch }}.tar.gz
@@ -77,7 +77,7 @@ jobs:
       ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -86,7 +86,7 @@ jobs:
 
       - name: Restore wxWidgets build
         id: wx-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/wx
           key: wx-ubuntu-24.04-${{ hashFiles('vcpkg-ports/wxwidgets/vcpkg.json', 'vcpkg-ports/wxwidgets/portfile.cmake', 'scripts/build-wxwidgets.sh') }}
@@ -137,7 +137,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Check out vcpkg at exactly the manifest's builtin-baseline so the
       # dependency versions match vcpkg.json and a shallow clone is enough.
@@ -159,7 +159,7 @@ jobs:
           fi
 
       - name: Restore vcpkg binary cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}-${{ hashFiles('vcpkg.json', 'vcpkg-ports/**', 'cmake/triplets/**') }}
@@ -172,7 +172,7 @@ jobs:
 
       - name: Upload vcpkg logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vcpkg-logs-${{ matrix.triplet }}
           path: |
@@ -192,7 +192,7 @@ jobs:
       - name: Package artifact
         run: tar -C stage -czf ${{ matrix.artifact }}.tar.gz .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
