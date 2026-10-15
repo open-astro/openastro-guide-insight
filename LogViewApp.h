@@ -22,6 +22,8 @@
 
 #include <wx/app.h>
 #include <wx/config.h>
+#include <wx/font.h>
+#include <wx/gdicmn.h>
 
 class LogViewFrame;
 
@@ -44,5 +46,17 @@ private:
 };
 
 wxDECLARE_APP(LogViewApp);
+
+// Font for text drawn on graphs: axis labels, event markers, legends.
+inline wxFont GraphLabelFont()
+{
+#if defined(__WXOSX__)
+    // macOS's small system font is already compact; making it smaller again
+    // left the labels unreadable (upstream issue #18).
+    return *wxSMALL_FONT;
+#else
+    return wxSWISS_FONT->Smaller();
+#endif
+}
 
 #endif
