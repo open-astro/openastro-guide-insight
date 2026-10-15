@@ -1,0 +1,4 @@
+# vcpkg overlay ports are copied from microsoft/vcpkg, which disables
+# line-ending conversion. Patches must keep their exact bytes, or git's
+# autocrlf on Windows corrupts them.
+vcpkg-ports/** -text
