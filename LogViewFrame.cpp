@@ -32,6 +32,7 @@
 #include <wx/graphics.h>
 #include <wx/grid.h>
 #include <wx/log.h>
+#include <wx/msgdlg.h>
 #include <wx/splitter.h>
 #include <wx/stopwatch.h>
 #include <wx/textentry.h>
@@ -419,6 +420,16 @@ void LogViewFrame::OpenLog(const wxString& filename)
         LogParser parser;
         parser.progress = [] { wxGetApp().Yield(); };
         parser.Parse(ifs, s_log);
+    }
+
+    if (s_log.is_debug_log)
+    {
+        wxMessageBox(wxString::Format(
+                         "%s is a PHD2 debug log.\n\n"
+                         "PHD2 Log Viewer reads guide logs. Open the file named "
+                         "PHD2_GuideLog_<date>.txt from the same folder instead.",
+                         fn.GetFullName()),
+                     "Not a guide log", wxOK | wxICON_INFORMATION, this);
     }
 
     if (!s_log.phd_version.empty())

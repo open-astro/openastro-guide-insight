@@ -190,3 +190,23 @@ TEST_CASE("Progress callback is invoked on long logs", "[parser]")
 
     CHECK(calls > 0);
 }
+
+TEST_CASE("A PHD2 debug log is recognised", "[parser]")
+{
+    // First lines of a real debug log from the OpenAstro guider. Each line is
+    // prefixed with the time, the time since the previous line, and a thread id.
+    GuideLog log = ParseText(
+        "15:32:11.204 00.000 2041 OpenAstro Alpaca Support\n"
+        "15:32:11.205 00.001 2041 PHD2 version 2.1.0 begins execution with:\n"
+        "15:32:11.205 00.000 2041    Linux 6.12.47+rpt-rpi-2712 aarch64\n"
+        "15:32:11.206 00.001 2041    wxWidgets 3.2.6\n");
+
+    CHECK(log.is_debug_log);
+    CHECK(log.sections.empty());
+}
+
+TEST_CASE("A guide log is not mistaken for a debug log", "[parser]")
+{
+    CHECK_FALSE(ParseFile("openastro_redcat51_2026-10-04.txt").is_debug_log);
+    CHECK_FALSE(ParseText("").is_debug_log);
+}
