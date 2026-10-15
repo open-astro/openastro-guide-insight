@@ -127,6 +127,8 @@ add_library(phdlogview_core STATIC
   logparser.h
   analysis.cpp
   analysis.h
+  graphmath.cpp
+  graphmath.h
 )
 target_include_directories(phdlogview_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(phdlogview_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
