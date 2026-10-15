@@ -86,7 +86,7 @@ jobs:
           - name: macOS arm64
             runner: macos-15
             preset: macos-arm64
-            triplet: arm64-osx-11
+            triplet: arm64-osx-26
             artifact: phdlogview-macos-arm64
             werror: "ON"
           - name: Windows x64

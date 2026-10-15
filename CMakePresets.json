@@ -71,7 +71,7 @@
       "inherits": "vcpkg",
       "generator": "Ninja",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "arm64-osx-11",
+        "VCPKG_TARGET_TRIPLET": "arm64-osx-26",
         "CMAKE_OSX_ARCHITECTURES": "arm64"
       },
       "condition": {
