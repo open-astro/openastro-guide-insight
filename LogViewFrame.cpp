@@ -2201,6 +2201,7 @@ void LogViewFrame::OnKeyDown(wxKeyEvent& event)
             OnVPan(dummy);
             break;
         }
+        [[fallthrough]];
     default:
         event.Skip();
         break;
