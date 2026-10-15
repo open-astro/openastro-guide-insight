@@ -18,7 +18,6 @@
  */
 
 #include "logparser.h"
-#include "LogViewApp.h"
 
 #include <algorithm>
 #include <wx/tokenzr.h>
@@ -542,8 +541,8 @@ bool LogParser::Parse(std::istream& is, GuideLog& log)
     while (std::getline(is, ln))
     {
         ++nr;
-        if (nr % 200 == 0)
-            wxGetApp().Yield();
+        if (nr % 200 == 0 && progress)
+            progress();
 
         rtrim(ln);
 
