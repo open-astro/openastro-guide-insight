@@ -53,8 +53,24 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # manifest (vcpkg.json). Linux and local development builds can use system
 # packages. Either way the same find_package calls apply.
 
-find_package(wxWidgets 3.0 REQUIRED COMPONENTS html core base)
-include(${wxWidgets_USE_FILE})
+# Prefer wxWidgets' own CMake package (vcpkg installs it). Its targets carry
+# the full static dependency list, such as PCRE2 for wxRegEx. Fall back to
+# CMake's FindwxWidgets module, which uses wx-config, for system packages.
+# No version in the CONFIG call: wxWidgets' package only accepts requests for
+# its own minor version, so the minimum is checked separately.
+find_package(wxWidgets CONFIG QUIET COMPONENTS html core base)
+if(wxWidgets_FOUND)
+  if(wxWidgets_VERSION VERSION_LESS 3.0)
+    message(FATAL_ERROR "wxWidgets 3.0 or newer is required, found ${wxWidgets_VERSION}")
+  endif()
+  set(PHDLOGVIEW_WX_LIBS wx::html wx::core wx::base)
+  message(STATUS "Found wxWidgets ${wxWidgets_VERSION} (CMake package)")
+else()
+  find_package(wxWidgets 3.0 REQUIRED COMPONENTS html core base)
+  include(${wxWidgets_USE_FILE})
+  set(PHDLOGVIEW_WX_LIBS ${wxWidgets_LIBRARIES})
+endif()
+
 find_package(GSL REQUIRED)
 
 #################################################################################
@@ -95,7 +111,7 @@ add_library(phdlogview_core STATIC
 )
 target_include_directories(phdlogview_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(phdlogview_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
-target_link_libraries(phdlogview_core PUBLIC ${wxWidgets_LIBRARIES} GSL::gsl GSL::gslcblas)
+target_link_libraries(phdlogview_core PUBLIC ${PHDLOGVIEW_WX_LIBS} GSL::gsl GSL::gslcblas)
 if(MSVC)
   target_compile_definitions(phdlogview_core PUBLIC _CRT_SECURE_NO_WARNINGS)
   target_compile_options(phdlogview_core PUBLIC /utf-8)
