@@ -116,6 +116,24 @@ TEST_CASE("Session with no usable frames has zero statistics", "[analysis]")
     CHECK(s.drift_dec == 0.);
 }
 
+TEST_CASE("Session where every frame lost the star has zero statistics", "[analysis]")
+{
+    GuideSession s("2026-01-01 00:00:00");
+    for (int i = 0; i < 5; i++)
+    {
+        GuideEntry e = MakeEntry(i + 1, 2. * i, 1. + i, 2. + i);
+        e.included = false;
+        e.err = 2; // star lost
+        s.entries.push_back(e);
+    }
+    s.CalcStats();
+    CHECK(s.rms_ra == 0.);
+    CHECK(s.rms_dec == 0.);
+    CHECK(s.drift_ra == 0.);
+    CHECK(s.drift_dec == 0.);
+    CHECK(s.paerr == 0.);
+}
+
 TEST_CASE("Guiding Assistant analysis needs at least 12 frames", "[analysis]")
 {
     GuideSession s = SineSession(11, 120., 1., 0.);

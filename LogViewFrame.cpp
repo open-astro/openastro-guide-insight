@@ -102,7 +102,7 @@ struct FileDropTarget : public wxFileDropTarget
 {
     LogViewFrame *m_lvf;
     FileDropTarget(LogViewFrame *lvf) : m_lvf(lvf) { }
-    bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames) {
+    bool OnDropFiles(wxCoord WXUNUSED(x), wxCoord WXUNUSED(y), const wxArrayString& filenames) {
         if (filenames.size() == 1)
         {
             m_lvf->OpenLog(filenames[0]);
@@ -477,12 +477,12 @@ void LogViewFrame::OpenLog(const wxString& filename)
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnFileExit(wxCommandEvent& event)
+void LogViewFrame::OnFileExit(wxCommandEvent& WXUNUSED(event))
 {
     Close();
 }
 
-void LogViewFrame::OnFileOpen(wxCommandEvent& event)
+void LogViewFrame::OnFileOpen(wxCommandEvent& WXUNUSED(event))
 {
     wxFileDialog openFileDialog(this, _("Open PHD2 Guide Log"),
         Config->Read("/FileOpenDir", wxEmptyString),
@@ -510,17 +510,17 @@ static void OnColor(wxWindow *parent, wxButton *btn, wxColor *color)
     }
 }
 
-void SettingsDialog::OnRAColor(wxCommandEvent& event)
+void SettingsDialog::OnRAColor(wxCommandEvent& WXUNUSED(event))
 {
     OnColor(this, m_raColorBtn, &m_raColor);
 }
 
-void SettingsDialog::OnDecColor(wxCommandEvent& event)
+void SettingsDialog::OnDecColor(wxCommandEvent& WXUNUSED(event))
 {
     OnColor(this, m_decColorBtn, &m_decColor);
 }
 
-void LogViewFrame::OnFileSettings(wxCommandEvent& event)
+void LogViewFrame::OnFileSettings(wxCommandEvent& WXUNUSED(event))
 {
     SettingsDialog dlg(this);
 
@@ -674,7 +674,7 @@ void LogViewFrame::OnMenuInclude(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnMenuAnalyzeGA(wxCommandEvent& event)
+void LogViewFrame::OnMenuAnalyzeGA(wxCommandEvent& WXUNUSED(event))
 {
     if (!m_analysisWin)
         m_analysisWin = new AnalysisWin(this);
@@ -708,7 +708,7 @@ void LogViewFrame::OnMenuAnalyzeAll(wxCommandEvent& event)
         m_analysisWin->Show();
 }
 
-void LogViewFrame::OnHelpAbout(wxCommandEvent& event)
+void LogViewFrame::OnHelpAbout(wxCommandEvent& WXUNUSED(event))
 {
     wxAboutDialogInfo aboutInfo;
 
@@ -764,7 +764,7 @@ HelpDialog::~HelpDialog()
     s_help = 0;
 }
 
-void LogViewFrame::OnHelp(wxCommandEvent& event)
+void LogViewFrame::OnHelp(wxCommandEvent& WXUNUSED(event))
 {
     if (!s_help)
         s_help = new HelpDialog(this);
@@ -1245,7 +1245,7 @@ void LogViewFrame::OnCaptureLost(wxMouseCaptureLostEvent& evt)
     evt.Skip();
 }
 
-void LogViewFrame::OnTimer(wxTimerEvent& evt)
+void LogViewFrame::OnTimer(wxTimerEvent& WXUNUSED(evt))
 {
     wxLongLong_t now = ::now();
     long dt = now - s_drag.m_mouseTime[1];
@@ -1439,7 +1439,7 @@ static void PaintCalibration(wxDC& dc, const Calibration *cal, wxWindow *graph)
     }
 }
 
-void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
+void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
 {
     wxAutoBufferedPaintDC dc(m_graph);
 
@@ -1925,7 +1925,7 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
     }
 }
 
-void LogViewFrame::OnVPlus( wxCommandEvent& event )
+void LogViewFrame::OnVPlus( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1938,7 +1938,7 @@ void LogViewFrame::OnVPlus( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVMinus( wxCommandEvent& event )
+void LogViewFrame::OnVMinus( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1951,7 +1951,7 @@ void LogViewFrame::OnVMinus( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVReset( wxCommandEvent& event )
+void LogViewFrame::OnVReset( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1976,7 +1976,7 @@ void LogViewFrame::OnVReset( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVPan(wxCommandEvent& event)
+void LogViewFrame::OnVPan(wxCommandEvent& WXUNUSED(event))
 {
     if (m_vpan->GetValue())
         m_vpan->SetLabel("&P/Z");
@@ -1984,7 +1984,7 @@ void LogViewFrame::OnVPan(wxCommandEvent& event)
         m_vpan->SetLabel("P/&Z");
 }
 
-void LogViewFrame::OnVLock(wxCommandEvent& event)
+void LogViewFrame::OnVLock(wxCommandEvent& WXUNUSED(event))
 {
     if (m_vlock->GetValue())
     {
@@ -2032,7 +2032,7 @@ static void Rescale(GuideSession *session, double f, unsigned int width)
     UpdateRange(&ginfo);
 }
 
-void LogViewFrame::OnHMinus(wxCommandEvent& event)
+void LogViewFrame::OnHMinus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2052,7 +2052,7 @@ void LogViewFrame::OnHMinus(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnHPlus(wxCommandEvent& event)
+void LogViewFrame::OnHPlus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2071,7 +2071,7 @@ void LogViewFrame::OnHPlus(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnHReset(wxCommandEvent& event)
+void LogViewFrame::OnHReset(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2132,12 +2132,12 @@ void LogViewFrame::OnSizeGraph(wxSizeEvent& event)
     UpdateScrollbar();
 }
 
-void LogViewFrame::OnDevice( wxCommandEvent& event )
+void LogViewFrame::OnDevice( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnUnits( wxCommandEvent& event )
+void LogViewFrame::OnUnits( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 
@@ -2145,24 +2145,24 @@ void LogViewFrame::OnUnits( wxCommandEvent& event )
         m_analysisWin->RefreshGraph();
 }
 
-void LogViewFrame::OnAxes( wxCommandEvent& event )
+void LogViewFrame::OnAxes( wxCommandEvent& WXUNUSED(event) )
 {
     InitLegends(m_axes->GetSelection() == 0, m_raLegend, m_decLegend);
     s_scatter.Invalidate();
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnCorrectionsChecked( wxCommandEvent& event )
+void LogViewFrame::OnCorrectionsChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnDecChecked( wxCommandEvent& event )
+void LogViewFrame::OnDecChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnRAChecked( wxCommandEvent& event )
+void LogViewFrame::OnRAChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
@@ -2269,7 +2269,7 @@ static void _shell_open(const wxString& loc)
 #endif
 }
 
-void LogViewFrame::OnLaunchEditor(wxCommandEvent& event)
+void LogViewFrame::OnLaunchEditor(wxCommandEvent& WXUNUSED(event))
 {
     if (!m_filename.empty())
         _shell_open(m_filename);
