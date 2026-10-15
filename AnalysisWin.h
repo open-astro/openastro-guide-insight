@@ -22,38 +22,7 @@
 
 #include "LogViewFrame.h"
 
-struct GuideSession;
-
-class Spline
-{
-    void *spline;
-    void *accel;
-public:
-    Spline() : spline(nullptr), accel(nullptr) { }
-    Spline(const double *x, const double *y, size_t n) : spline(nullptr), accel(nullptr) { Init(x, y, n); }
-    void Init(const double *x, const double *y, size_t n);
-    ~Spline();
-    double Eval(double x) const;
-};
-
-struct GARun
-{
-    wxDateTime starts;
-    double pixscale;
-    size_t len;
-    double *t;
-    double *rac;  // drift-corrected RA
-    double *decc; // drift-corrected Dec
-    size_t nfft;
-    double *fftx; // FFT period
-    double *ffty; // FFT amplitude
-    Spline ffts;  // FFT spline for graphing
-    double fftymax;
-    GARun() : len(0), t(nullptr), rac(nullptr), decc(nullptr), nfft(0), fftx(nullptr), ffty(nullptr) { }
-    ~GARun();
-    static bool CanAnalyze(const GuideSession& session, size_t begin, size_t end);
-    void Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections);
-};
+#include "analysis.h"
 
 class AnalysisWin : public AnalyzeFrameBase
 {

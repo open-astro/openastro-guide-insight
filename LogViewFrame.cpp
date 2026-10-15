@@ -416,7 +416,9 @@ void LogViewFrame::OpenLog(const wxString& filename)
     {
         wxWindowDisabler disableAll;
         wxBusyInfo wait("Please wait, working...");
-        LogParser().Parse(ifs, s_log);
+        LogParser parser;
+        parser.progress = [] { wxGetApp().Yield(); };
+        parser.Parse(ifs, s_log);
     }
 
     if (!s_log.phd_version.empty())

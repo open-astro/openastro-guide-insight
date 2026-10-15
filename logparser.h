@@ -24,6 +24,7 @@
 #include <wx/datetime.h>
 #include <wx/string.h>
 
+#include <functional>
 #include <iostream>
 #include <math.h>
 #include <string>
@@ -218,6 +219,9 @@ struct GuideLog
 class LogParser
 {
 public:
+    // Called periodically while parsing so a GUI can stay responsive.
+    std::function<void()> progress;
+
     bool Parse(std::istream& is, GuideLog& log);
 };
 
