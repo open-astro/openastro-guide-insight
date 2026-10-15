@@ -537,7 +537,7 @@ bool LogParser::Parse(std::istream& is, GuideLog& log)
     enum State { SKIP, GUIDING_HDR, GUIDING, CAL_HDR, CALIBRATING, };
     State st = SKIP;
     enum HdrState { GLOBAL, AO, MOUNT, };
-    HdrState hdrst;
+    HdrState hdrst = GLOBAL;
     char axis = ' ';
     GuideSession *s = 0;
     Calibration *cal = 0;
