@@ -468,7 +468,7 @@ void LogViewFrame::OpenLog(const wxString& filename)
             m_splitter1->SetSashPosition(x);
         } // end hack
 
-        m_sessions->Show();
+        m_sessions->Show(true);
     }
 
     s_scatter.Invalidate();
