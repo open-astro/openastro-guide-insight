@@ -17,6 +17,7 @@ add_executable(phdlogview_tests
   test_build.cpp
 )
 target_link_libraries(phdlogview_tests PRIVATE phdlogview_core Catch2::Catch2)
+phdlogview_warnings(phdlogview_tests)
 target_compile_definitions(phdlogview_tests PRIVATE
   TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 

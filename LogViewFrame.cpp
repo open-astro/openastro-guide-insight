@@ -102,7 +102,7 @@ struct FileDropTarget : public wxFileDropTarget
 {
     LogViewFrame *m_lvf;
     FileDropTarget(LogViewFrame *lvf) : m_lvf(lvf) { }
-    bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames) {
+    bool OnDropFiles(wxCoord WXUNUSED(x), wxCoord WXUNUSED(y), const wxArrayString& filenames) {
         if (filenames.size() == 1)
         {
             m_lvf->OpenLog(filenames[0]);
@@ -477,12 +477,12 @@ void LogViewFrame::OpenLog(const wxString& filename)
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnFileExit(wxCommandEvent& event)
+void LogViewFrame::OnFileExit(wxCommandEvent& WXUNUSED(event))
 {
     Close();
 }
 
-void LogViewFrame::OnFileOpen(wxCommandEvent& event)
+void LogViewFrame::OnFileOpen(wxCommandEvent& WXUNUSED(event))
 {
     wxFileDialog openFileDialog(this, _("Open PHD2 Guide Log"),
         Config->Read("/FileOpenDir", wxEmptyString),
@@ -510,17 +510,17 @@ static void OnColor(wxWindow *parent, wxButton *btn, wxColor *color)
     }
 }
 
-void SettingsDialog::OnRAColor(wxCommandEvent& event)
+void SettingsDialog::OnRAColor(wxCommandEvent& WXUNUSED(event))
 {
     OnColor(this, m_raColorBtn, &m_raColor);
 }
 
-void SettingsDialog::OnDecColor(wxCommandEvent& event)
+void SettingsDialog::OnDecColor(wxCommandEvent& WXUNUSED(event))
 {
     OnColor(this, m_decColorBtn, &m_decColor);
 }
 
-void LogViewFrame::OnFileSettings(wxCommandEvent& event)
+void LogViewFrame::OnFileSettings(wxCommandEvent& WXUNUSED(event))
 {
     SettingsDialog dlg(this);
 
@@ -674,7 +674,7 @@ void LogViewFrame::OnMenuInclude(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnMenuAnalyzeGA(wxCommandEvent& event)
+void LogViewFrame::OnMenuAnalyzeGA(wxCommandEvent& WXUNUSED(event))
 {
     if (!m_analysisWin)
         m_analysisWin = new AnalysisWin(this);
@@ -708,7 +708,7 @@ void LogViewFrame::OnMenuAnalyzeAll(wxCommandEvent& event)
         m_analysisWin->Show();
 }
 
-void LogViewFrame::OnHelpAbout(wxCommandEvent& event)
+void LogViewFrame::OnHelpAbout(wxCommandEvent& WXUNUSED(event))
 {
     wxAboutDialogInfo aboutInfo;
 
@@ -764,7 +764,7 @@ HelpDialog::~HelpDialog()
     s_help = 0;
 }
 
-void LogViewFrame::OnHelp(wxCommandEvent& event)
+void LogViewFrame::OnHelp(wxCommandEvent& WXUNUSED(event))
 {
     if (!s_help)
         s_help = new HelpDialog(this);
@@ -1245,7 +1245,7 @@ void LogViewFrame::OnCaptureLost(wxMouseCaptureLostEvent& evt)
     evt.Skip();
 }
 
-void LogViewFrame::OnTimer(wxTimerEvent& evt)
+void LogViewFrame::OnTimer(wxTimerEvent& WXUNUSED(evt))
 {
     wxLongLong_t now = ::now();
     long dt = now - s_drag.m_mouseTime[1];
@@ -1439,7 +1439,7 @@ static void PaintCalibration(wxDC& dc, const Calibration *cal, wxWindow *graph)
     }
 }
 
-void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
+void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
 {
     wxAutoBufferedPaintDC dc(m_graph);
 
@@ -1530,24 +1530,24 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
             double dt0 = m_session->entries[i0].dt;
             double dt1 = m_session->entries[i1].dt;
             double tspan = dt1 - dt0;
-            int x0 = (int)(((double)i0 + 0.5) * ginfo.hscale) - ginfo.xofs;
+            int tick_x0 = (int)(((double)i0 + 0.5) * ginfo.hscale) - ginfo.xofs;
             int x1 = (int)(((double)i1 + 0.5) * ginfo.hscale) - ginfo.xofs;
-            double r = (double)(x1 - x0) / tspan; // pixels per second
+            double r = (double)(x1 - tick_x0) / tspan; // pixels per second
             int secs = (int)(ceil(80.0 / (r * 60.0)) * 60.0); // seconds per tick
             wxDateTime ti0(m_session->starts + wxTimeSpan(0, 0, 0, (wxLongLong)(dt0 * 1000.0)));
             wxDateTime t0(ti0);
             time_t ticks = ((t0.GetTicks() + secs - 1) / secs) * secs;
             t0.Set(ticks); // time of first tick
-            double t = (double)(t0 - ti0).GetMilliseconds().GetValue() / 1000.0;
+            double tick_t = (double)(t0 - ti0).GetMilliseconds().GetValue() / 1000.0;
             wxDateTime t1(m_session->starts + wxTimeSpan(0, 0, 0, (wxLongLong)(dt1 * 1000.0)));
             double tend = (double)(t1 - ti0).GetMilliseconds().GetValue() / 1000.0;
 
             dc.SetPen(*wxGREY_PEN);
-            for (; t < tend; t += secs)
+            for (; tick_t < tend; tick_t += secs)
             {
-                int x = (int)((double) x0 + r * t);
+                int x = (int)((double) tick_x0 + r * tick_t);
                 dc.DrawLine(x, 0, x, 10);
-                wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(t * 1000.0)));
+                wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(tick_t * 1000.0)));
                 dc.DrawText(wxt.Format("%H:%M"), x + 3, 1);
             }
         }
@@ -1763,8 +1763,7 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
     // excluded sections
     if (i1 >= i0)
     {
-        bool included = entries[i0].included;
-        bool prev_included = included;
+        bool prev_included = entries[i0].included;
         unsigned int e0 = i0;
 
         wxGraphicsContext *gc = 0;
@@ -1782,9 +1781,9 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
                 }
                 if (gc)
                 {
-                    int x0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
+                    int rx0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
                     int x1 = (int)((double)(i - 1.0 + 0.25) * ginfo.hscale) - ginfo.xofs;
-                    gc->DrawRectangle(x0, 0, x1 - x0 + 1, m_graph->GetSize().GetHeight());
+                    gc->DrawRectangle(rx0, 0, x1 - rx0 + 1, m_graph->GetSize().GetHeight());
                 }
             }
             else if (!included && prev_included)
@@ -1804,9 +1803,9 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
             }
             if (gc)
             {
-                int x0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
+                int rx0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
                 int x1 = (int)((double)(i1 + 0.25) * ginfo.hscale) - ginfo.xofs;
-                gc->DrawRectangle(x0, 0, x1 - x0 + 1, m_graph->GetSize().GetHeight());
+                gc->DrawRectangle(rx0, 0, x1 - rx0 + 1, m_graph->GetSize().GetHeight());
             }
         }
 
@@ -1816,14 +1815,14 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
     // events
     if (m_events->IsChecked())
     {
-        int i1 = std::min((int)entries.size(), (int)floor(ginfo.i1));
+        int last = std::min((int)entries.size(), (int)floor(ginfo.i1));
         const GuideSession::InfoVec& infos = m_session->infos;
         int prev_end = -999999;
         int row = 1;
         for (auto it = infos.begin(); it != infos.end(); ++it)
         {
             const auto& info = *it;
-            if (info.idx > i1)
+            if (info.idx > last)
                 break;
             wxString s = info.repeats > 1 ? wxString::Format("%d x %s", info.repeats, info.info) : wxString(info.info);
             int width = dc.GetTextExtent(s).x;
@@ -1925,7 +1924,7 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& event)
     }
 }
 
-void LogViewFrame::OnVPlus( wxCommandEvent& event )
+void LogViewFrame::OnVPlus( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1938,7 +1937,7 @@ void LogViewFrame::OnVPlus( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVMinus( wxCommandEvent& event )
+void LogViewFrame::OnVMinus( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1951,7 +1950,7 @@ void LogViewFrame::OnVMinus( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVReset( wxCommandEvent& event )
+void LogViewFrame::OnVReset( wxCommandEvent& WXUNUSED(event) )
 {
     if (m_session)
     {
@@ -1976,7 +1975,7 @@ void LogViewFrame::OnVReset( wxCommandEvent& event )
     }
 }
 
-void LogViewFrame::OnVPan(wxCommandEvent& event)
+void LogViewFrame::OnVPan(wxCommandEvent& WXUNUSED(event))
 {
     if (m_vpan->GetValue())
         m_vpan->SetLabel("&P/Z");
@@ -1984,7 +1983,7 @@ void LogViewFrame::OnVPan(wxCommandEvent& event)
         m_vpan->SetLabel("P/&Z");
 }
 
-void LogViewFrame::OnVLock(wxCommandEvent& event)
+void LogViewFrame::OnVLock(wxCommandEvent& WXUNUSED(event))
 {
     if (m_vlock->GetValue())
     {
@@ -2032,7 +2031,7 @@ static void Rescale(GuideSession *session, double f, unsigned int width)
     UpdateRange(&ginfo);
 }
 
-void LogViewFrame::OnHMinus(wxCommandEvent& event)
+void LogViewFrame::OnHMinus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2052,7 +2051,7 @@ void LogViewFrame::OnHMinus(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnHPlus(wxCommandEvent& event)
+void LogViewFrame::OnHPlus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2071,7 +2070,7 @@ void LogViewFrame::OnHPlus(wxCommandEvent& event)
     }
 }
 
-void LogViewFrame::OnHReset(wxCommandEvent& event)
+void LogViewFrame::OnHReset(wxCommandEvent& WXUNUSED(event))
 {
     if (m_session)
     {
@@ -2132,12 +2131,12 @@ void LogViewFrame::OnSizeGraph(wxSizeEvent& event)
     UpdateScrollbar();
 }
 
-void LogViewFrame::OnDevice( wxCommandEvent& event )
+void LogViewFrame::OnDevice( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnUnits( wxCommandEvent& event )
+void LogViewFrame::OnUnits( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 
@@ -2145,24 +2144,24 @@ void LogViewFrame::OnUnits( wxCommandEvent& event )
         m_analysisWin->RefreshGraph();
 }
 
-void LogViewFrame::OnAxes( wxCommandEvent& event )
+void LogViewFrame::OnAxes( wxCommandEvent& WXUNUSED(event) )
 {
     InitLegends(m_axes->GetSelection() == 0, m_raLegend, m_decLegend);
     s_scatter.Invalidate();
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnCorrectionsChecked( wxCommandEvent& event )
+void LogViewFrame::OnCorrectionsChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnDecChecked( wxCommandEvent& event )
+void LogViewFrame::OnDecChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
 
-void LogViewFrame::OnRAChecked( wxCommandEvent& event )
+void LogViewFrame::OnRAChecked( wxCommandEvent& WXUNUSED(event) )
 {
     m_graph->Refresh();
 }
@@ -2201,6 +2200,7 @@ void LogViewFrame::OnKeyDown(wxKeyEvent& event)
             OnVPan(dummy);
             break;
         }
+        [[fallthrough]];
     default:
         event.Skip();
         break;
@@ -2269,7 +2269,7 @@ static void _shell_open(const wxString& loc)
 #endif
 }
 
-void LogViewFrame::OnLaunchEditor(wxCommandEvent& event)
+void LogViewFrame::OnLaunchEditor(wxCommandEvent& WXUNUSED(event))
 {
     if (!m_filename.empty())
         _shell_open(m_filename);

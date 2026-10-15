@@ -312,7 +312,7 @@ void AnalysisWin::AnalyzeAll(const GuideSession& session, bool undo_ra_correctio
     SetTitle(undo_ra_corrections ? _("Analysis ** RA Corrections Removed **") : _("Analysis"));
 }
 
-void AnalysisWin::OnCheck(wxCommandEvent& event)
+void AnalysisWin::OnCheck(wxCommandEvent& WXUNUSED(event))
 {
     m_graph->Refresh();
 }
@@ -323,7 +323,7 @@ void AnalysisWin::OnClose(wxCloseEvent& event)
     event.Skip();
 }
 
-void AnalysisWin::OnSizeGraph(wxSizeEvent& event)
+void AnalysisWin::OnSizeGraph(wxSizeEvent& WXUNUSED(event))
 {
     s_drpos.Resize(m_graph->GetSize());
     s_fftpos.Resize(m_graph->GetSize());
@@ -341,7 +341,7 @@ void AnalysisWin::OnBtnLeftDown(wxMouseEvent& event)
     }
 }
 
-void AnalysisWin::OnClickDrift(wxCommandEvent& event)
+void AnalysisWin::OnClickDrift(wxCommandEvent& WXUNUSED(event))
 {
     m_toggleFFT->SetValue(false);
     m_graph->Refresh();
@@ -352,7 +352,7 @@ void AnalysisWin::OnClickDrift(wxCommandEvent& event)
     Layout(); // in case size changed
 }
 
-void AnalysisWin::OnClickFFT(wxCommandEvent& event)
+void AnalysisWin::OnClickFFT(wxCommandEvent& WXUNUSED(event))
 {
     m_toggleDrift->SetValue(false);
     m_graph->Refresh();
@@ -363,7 +363,7 @@ void AnalysisWin::OnClickFFT(wxCommandEvent& event)
     Layout();
 }
 
-void AnalysisWin::OnSaveCSV(wxCommandEvent& event)
+void AnalysisWin::OnSaveCSV(wxCommandEvent& WXUNUSED(event))
 {
     if (m_garun.nfft == 0)
         return;
@@ -440,7 +440,7 @@ void AnalysisWin::OnLeftDown(wxMouseEvent& event)
     event.Skip();
 }
 
-void AnalysisWin::OnLeftUp(wxMouseEvent& event)
+void AnalysisWin::OnLeftUp(wxMouseEvent& WXUNUSED(event))
 {
     s_drag.dragging = false;
     m_graph->ReleaseMouse();
@@ -808,7 +808,7 @@ static void PaintFFT(AnalysisWin *aw, const GARun& ga, wxDC& dc)
     }
 }
 
-void AnalysisWin::OnPaintGraph(wxPaintEvent& event)
+void AnalysisWin::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
 {
     wxAutoBufferedPaintDC dc(m_graph);
     dc.Clear();
@@ -818,17 +818,17 @@ void AnalysisWin::OnPaintGraph(wxPaintEvent& event)
         PaintFFT(this, m_garun, dc);
 }
 
-void AnalysisWin::OnHMinus(wxCommandEvent& event)
+void AnalysisWin::OnHMinus(wxCommandEvent& WXUNUSED(event))
 {
     HZoomOut(this, -1);
 }
 
-void AnalysisWin::OnHPlus(wxCommandEvent& event)
+void AnalysisWin::OnHPlus(wxCommandEvent& WXUNUSED(event))
 {
     HZoomIn(this, -1);
 }
 
-void AnalysisWin::OnHReset(wxCommandEvent& event)
+void AnalysisWin::OnHReset(wxCommandEvent& WXUNUSED(event))
 {
     if (m_toggleFFT->GetValue())
     {
@@ -841,7 +841,7 @@ void AnalysisWin::OnHReset(wxCommandEvent& event)
     m_graph->Refresh();
 }
 
-void AnalysisWin::OnVMinus(wxCommandEvent& event)
+void AnalysisWin::OnVMinus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_toggleFFT->GetValue())
         s_fftpos.VZoom(1.0 / 1.1);
@@ -851,7 +851,7 @@ void AnalysisWin::OnVMinus(wxCommandEvent& event)
     m_graph->Refresh();
 }
 
-void AnalysisWin::OnVPlus(wxCommandEvent& event)
+void AnalysisWin::OnVPlus(wxCommandEvent& WXUNUSED(event))
 {
     if (m_toggleFFT->GetValue())
         s_fftpos.VZoom(1.1);
@@ -861,7 +861,7 @@ void AnalysisWin::OnVPlus(wxCommandEvent& event)
     m_graph->Refresh();
 }
 
-void AnalysisWin::OnVReset(wxCommandEvent& event)
+void AnalysisWin::OnVReset(wxCommandEvent& WXUNUSED(event))
 {
     if (m_toggleFFT->GetValue())
         s_fftpos.VReset(m_graph->GetSize().y);
