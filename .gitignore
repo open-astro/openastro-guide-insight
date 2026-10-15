@@ -1,2 +1,5 @@
 tmp
 TAGS
+out/
+vcpkg_installed/
+.DS_Store
