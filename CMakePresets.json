@@ -21,7 +21,9 @@
       "inherits": "base",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets"
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
+        "VCPKG_OVERLAY_PORTS": "${sourceDir}/vcpkg-ports",
+        "PHDLOGVIEW_EXPECTED_WX_VERSION": "3.2.12"
       }
     },
     {
