@@ -17,11 +17,13 @@
  *  with this program; if not, visit the http://fsf.org website.
  */
 
+#include "comma_locale.h"
 #include "logparser.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <clocale>
 #include <fstream>
 #include <sstream>
 
@@ -209,4 +211,24 @@ TEST_CASE("A guide log is not mistaken for a debug log", "[parser]")
 {
     CHECK_FALSE(ParseFile("openastro_redcat51_2026-10-04.txt").is_debug_log);
     CHECK_FALSE(ParseText("").is_debug_log);
+}
+
+
+TEST_CASE("Numbers parse the same when the system uses a decimal comma", "[parser]")
+{
+    // Upstream issue #12: with a comma decimal separator, values were cut off
+    // at the decimal point. PHD2 always writes a decimal point.
+    CommaDecimalLocale comma;
+    if (!comma.Active())
+        SKIP("no locale with a decimal comma is installed");
+
+    GuideLog log = ParseFile("openastro_redcat51_2026-10-04.txt");
+
+    REQUIRE(log.sessions.size() == 2);
+    const GuideSession& s0 = log.sessions[0];
+    CHECK_THAT(s0.pixelScale, WithinAbs(6.45, 1e-9));
+    CHECK_THAT(s0.mount.xRate, WithinAbs(0.822, 1e-9));
+    CHECK_THAT(s0.entries.front().dt, WithinAbs(8.408, 1e-4));
+    CHECK_THAT(s0.entries.front().raraw, WithinAbs(1.601, 1e-4));
+    CHECK_THAT(s0.entries.front().snr, WithinAbs(52.15, 1e-3));
 }

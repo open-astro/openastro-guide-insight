@@ -20,6 +20,8 @@
 #include "logparser.h"
 
 #include <algorithm>
+#include <charconv>
+#include <cstring>
 #include <wx/tokenzr.h>
 #include <wx/txtstrm.h>
 #include <wx/wfstream.h>
@@ -81,19 +83,28 @@ inline static bool toLong(const char *s, long *p)
     return false;
 }
 
+// PHD2 always writes a decimal point, so parse without consulting the C
+// locale. strtod would stop at the '.' under a decimal-comma locale, which
+// GTK installs on Linux at startup.
 inline static bool toDouble(const char *s, double *p)
 {
-    if (s)
-    {
-        char *endptr;
-        double d = strtod(s, &endptr);
-        if (endptr != s)
-        {
-            *p = d;
-            return true;
-        }
-    }
-    return false;
+    if (!s)
+        return false;
+
+    // accept what strtod accepted: leading spaces and an explicit '+'
+    while (*s == ' ' || *s == '\t')
+        ++s;
+    if (*s == '+')
+        ++s;
+
+    const char *end = s + strlen(s);
+    double d;
+    auto res = std::from_chars(s, end, d);
+    if (res.ec != std::errc() || res.ptr == s)
+        return false;
+
+    *p = d;
+    return true;
 }
 
 inline static void toDouble(const char *s, double *d, double dflt)
