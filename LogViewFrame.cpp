@@ -20,6 +20,7 @@
 #include "LogViewFrame.h"
 #include "LogViewApp.h"
 #include "AnalysisWin.h"
+#include "graphmath.h"
 #include "logparser.h"
 
 #include <wx/aboutdlg.h>
@@ -1688,6 +1689,26 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
         }
     }
 
+    // Each series is drawn as one line per run of frames where the star was
+    // found, so frames with no measurement show as gaps instead of zeroes.
+    const std::vector<IndexRun> runs = FoundRuns(entries, i0, i1);
+    auto drawSeries = [&](auto yAt) {
+        for (const IndexRun& run : runs)
+        {
+            unsigned int ix = 0;
+            for (unsigned int i = run.first; i <= run.last; i++, ix++)
+            {
+                wxASSERT(ix < s_tmp.size);
+                s_tmp.pts[ix].x = (int)(x0 + (double)(i - i0) * ginfo.hscale);
+                s_tmp.pts[ix].y = yAt(i);
+            }
+            if (ix == 1)
+                dc.DrawPoint(s_tmp.pts[0]);
+            else
+                dc.DrawLines(ix, s_tmp.pts);
+        }
+    };
+
     if (m_mass->IsChecked())
     {
         double massscale;
@@ -1696,18 +1717,8 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
         else
             massscale = 1.0;
 
-        unsigned int ix = 0;
-        double x = x0;
-        for (unsigned int i = i0; i <= i1; i++)
-        {
-            s_tmp.pts[ix].x = (int)x;
-            s_tmp.pts[ix].y = y00 - (int)(entries[i].mass * massscale);
-
-            ++ix;
-            x += ginfo.hscale;
-        }
         dc.SetPen(*wxYELLOW_PEN);
-        dc.DrawLines(ix, s_tmp.pts);
+        drawSeries([&](unsigned int i) { return y00 - (int)(entries[i].mass * massscale); });
     }
 
     if (m_snr->IsChecked())
@@ -1718,57 +1729,30 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
         else
             snrscale = 1.0;
 
-        unsigned int ix = 0;
-        double x = x0;
-        for (unsigned int i = i0; i <= i1; i++)
-        {
-            s_tmp.pts[ix].x = (int)x;
-            s_tmp.pts[ix].y = y00 - (int)(entries[i].snr * snrscale);
-
-            ++ix;
-            x += ginfo.hscale;
-        }
         dc.SetPen(*wxWHITE_PEN);
-        dc.DrawLines(ix, s_tmp.pts);
+        drawSeries([&](unsigned int i) { return y00 - (int)(entries[i].snr * snrscale); });
     }
 
     // Ra
     if (m_ra->IsChecked())
     {
-        unsigned int ix = 0;
-        double x = x0;
-        for (unsigned int i = i0; i <= i1; i++)
-        {
-            wxASSERT(ix < s_tmp.size);
-            s_tmp.pts[ix].x = (int)x;
-            double val = radec ? entries[i].raraw : entries[i].dx;
-            s_tmp.pts[ix].y = y0 + (int)(val * vscale);
-
-            ++ix;
-            x += ginfo.hscale;
-        }
         wxPen raOrDxPen(s_settings.raColor, ginfo.hscale < 2.0 ? 1 : 2);
         dc.SetPen(raOrDxPen);
-        dc.DrawLines(ix, s_tmp.pts);
+        drawSeries([&](unsigned int i) {
+            double val = radec ? entries[i].raraw : entries[i].dx;
+            return y0 + (int)(val * vscale);
+        });
     }
 
     // Dec
     if (m_dec->IsChecked())
     {
-        unsigned int ix = 0;
-        double x = x0;
-        for (unsigned int i = i0; i <= i1; i++)
-        {
-            s_tmp.pts[ix].x = (int)x;
-            double val = radec ? -entries[i].decraw : entries[i].dy;
-            s_tmp.pts[ix].y = y0 + (int)(val * vscale);
-
-            ++ix;
-            x += ginfo.hscale;
-        }
         wxPen decOrDyPen(s_settings.decColor, ginfo.hscale < 2.0 ? 1 : 2);
         dc.SetPen(decOrDyPen);
-        dc.DrawLines(ix, s_tmp.pts);
+        drawSeries([&](unsigned int i) {
+            double val = radec ? -entries[i].decraw : entries[i].dy;
+            return y0 + (int)(val * vscale);
+        });
     }
 
     // excluded sections
