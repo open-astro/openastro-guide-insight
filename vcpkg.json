@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "phdlogview",
+  "description": "PHD2 Log Viewer",
+  "homepage": "https://github.com/open-astro/phdlogview",
+  "license": "GPL-3.0-or-later",
+  "builtin-baseline": "c52f7bd748185ef0e0daf033d9f2ddfc8a3449ea",
+  "dependencies": [
+    {
+      "name": "wxwidgets",
+      "default-features": false
+    },
+    "gsl"
+  ]
+}

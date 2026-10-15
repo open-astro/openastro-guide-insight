@@ -92,10 +92,15 @@ V=$(awk '/define +APP_VERSION_STR +/{gsub(/"/,"");print $3}' < <(dos2unix --quie
 
 INSTALLER=phdlogview${installer_arch}-${V}-installer
 
-vcpkg_args=()
-if [[ $VCPKG_ROOT ]]; then
-    vcpkg_args+=(-DVCPKG_ROOT=$VCPKG_ROOT)
+if [[ ! $VCPKG_ROOT ]]; then
+    echo "VCPKG_ROOT must point at a vcpkg checkout" >&2
+    exit 1
 fi
+case "$arch" in
+    x86) triplet=x86-windows-static ;;
+    x64) triplet=x64-windows-static ;;
+esac
+vcpkg_args=("-DCMAKE_TOOLCHAIN_FILE=$(cygpath -w "$VCPKG_ROOT")\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=$triplet)
 
 mkdir -p "$build_dir"
 cd "$build_dir"
