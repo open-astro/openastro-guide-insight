@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.24)
 # macOS: native Apple Silicon only. Must be set before project().
 if(APPLE)
   set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS target architectures")
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "26.0" CACHE STRING "Minimum macOS version")
 endif()
 
 # Windows + vcpkg static triplets: use the static CRT so no runtime DLLs ship.
