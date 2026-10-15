@@ -1,0 +1,176 @@
+/*
+ *  This file is part of phdlogview
+ *
+ *  Copyright (C) 2026 Open Astro contributors
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, visit the http://fsf.org website.
+ */
+
+#include "analysis.h"
+#include "logparser.h"
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+
+#include <cmath>
+#include <fstream>
+
+using Catch::Matchers::WithinAbs;
+
+namespace {
+
+GuideLog LoadRealLog()
+{
+    std::ifstream ifs(std::string(TEST_DATA_DIR) + "/openastro_redcat51_2026-10-04.txt");
+    REQUIRE(ifs.good());
+    GuideLog log;
+    LogParser().Parse(ifs, log);
+    REQUIRE(log.sessions.size() == 2);
+    return log;
+}
+
+GuideEntry MakeEntry(int frame, double t, double raraw, double decraw)
+{
+    GuideEntry e{};
+    e.frame = frame;
+    e.dt = (float) t;
+    e.mount = MOUNT;
+    e.included = true;
+    e.guiding = true;
+    e.raraw = (float) raraw;
+    e.decraw = (float) decraw;
+    e.err = 0;
+    return e;
+}
+
+// Unguided session whose RA error is a sine wave of the given period plus an
+// optional linear drift, sampled every 2 seconds.
+GuideSession SineSession(size_t n, double period, double amplitude, double drift_per_sec)
+{
+    GuideSession s("2026-01-01 00:00:00");
+    for (size_t i = 0; i < n; i++)
+    {
+        double t = 2.0 * (double) i;
+        double ra = amplitude * sin(2. * M_PI * t / period) + drift_per_sec * t;
+        s.entries.push_back(MakeEntry((int) i + 1, t, ra, 0.));
+    }
+    return s;
+}
+
+size_t PeakIndex(const GARun& ga)
+{
+    size_t best = 0;
+    for (size_t i = 1; i < ga.nfft; i++)
+        if (ga.ffty[i] > ga.ffty[best])
+            best = i;
+    return best;
+}
+
+} // namespace
+
+TEST_CASE("Session statistics match an independent calculation", "[analysis]")
+{
+    // Expected values were computed separately from the raw log rows
+    // (population standard deviation of RARawDistance / DECRawDistance).
+    GuideLog log = LoadRealLog();
+
+    GuideSession& s0 = log.sessions[0];
+    s0.CalcStats();
+    CHECK_THAT(s0.rms_ra, WithinAbs(0.292506, 1e-4));
+    CHECK_THAT(s0.rms_dec, WithinAbs(1.029488, 1e-4));
+    CHECK_THAT(s0.peak_ra, WithinAbs(1.601, 1e-4));
+    CHECK_THAT(s0.peak_dec, WithinAbs(6.315, 1e-4));
+
+    GuideSession& s1 = log.sessions[1];
+    s1.CalcStats();
+    CHECK_THAT(s1.rms_ra, WithinAbs(0.346399, 1e-4));
+    CHECK_THAT(s1.rms_dec, WithinAbs(0.431790, 1e-4));
+    CHECK_THAT(s1.peak_ra, WithinAbs(-4.116, 1e-4));
+    CHECK_THAT(s1.peak_dec, WithinAbs(3.035, 1e-4));
+
+    CHECK(s1.elongation >= 0.);
+    CHECK(s1.elongation <= 1.);
+    CHECK(std::isfinite(s1.drift_ra));
+    CHECK(std::isfinite(s1.drift_dec));
+    CHECK(std::isfinite(s1.paerr));
+}
+
+TEST_CASE("Session with no usable frames has zero statistics", "[analysis]")
+{
+    GuideSession s("2026-01-01 00:00:00");
+    s.CalcStats();
+    CHECK(s.rms_ra == 0.);
+    CHECK(s.rms_dec == 0.);
+    CHECK(s.drift_ra == 0.);
+    CHECK(s.drift_dec == 0.);
+}
+
+TEST_CASE("Guiding Assistant analysis needs at least 12 frames", "[analysis]")
+{
+    GuideSession s = SineSession(11, 120., 1., 0.);
+    CHECK_FALSE(GARun::CanAnalyze(s, 0, s.entries.size()));
+
+    s.entries.push_back(MakeEntry(12, 22., 0., 0.));
+    CHECK(GARun::CanAnalyze(s, 0, s.entries.size()));
+}
+
+TEST_CASE("Periodogram finds the period of a sine wave", "[analysis]")
+{
+    // 480 samples over 960 s: a 120 s period falls exactly on an FFT bin.
+    GuideSession s = SineSession(481, 120., 2., 0.);
+
+    GARun ga;
+    ga.Analyze(s, 0, s.entries.size(), false);
+
+    REQUIRE(ga.len == 481);
+    REQUIRE(ga.nfft == 481 / 2 - 1);
+    CHECK_THAT(ga.fftx[PeakIndex(ga)], WithinAbs(120., 1.));
+    CHECK(ga.fftymax == ga.ffty[PeakIndex(ga)]);
+}
+
+TEST_CASE("Linear drift is removed before the periodogram", "[analysis]")
+{
+    // A strong drift would dominate the longest periods if it were not removed.
+    GuideSession s = SineSession(481, 120., 2., 0.05);
+
+    GARun ga;
+    ga.Analyze(s, 0, s.entries.size(), false);
+
+    CHECK_THAT(ga.fftx[PeakIndex(ga)], WithinAbs(120., 1.));
+
+    // Drift-corrected RA should have no remaining trend.
+    double first = ga.rac[0], last = ga.rac[ga.len - 1];
+    CHECK(fabs(last - first) < 1.0);
+}
+
+TEST_CASE("Guiding Assistant analysis runs on a real session", "[analysis]")
+{
+    GuideLog log = LoadRealLog();
+    const GuideSession& s = log.sessions[1];
+
+    REQUIRE(GARun::CanAnalyze(s, 0, s.entries.size()));
+    GARun ga;
+    ga.Analyze(s, 0, s.entries.size(), true);
+
+    REQUIRE(ga.len == s.entries.size());
+    REQUIRE(ga.nfft == ga.len / 2 - 1);
+    for (size_t i = 0; i < ga.nfft; i++)
+    {
+        CHECK(std::isfinite(ga.fftx[i]));
+        CHECK(std::isfinite(ga.ffty[i]));
+        CHECK(ga.fftx[i] > 0.);
+    }
+    for (size_t i = 1; i < ga.nfft; i++)
+        CHECK(ga.fftx[i] > ga.fftx[i - 1]); // periods ascend
+}

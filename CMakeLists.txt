@@ -86,6 +86,21 @@ endif()
 #################################################################################
 # Application
 
+# Parser and analysis code, independent of the GUI so it can be unit tested.
+add_library(phdlogview_core STATIC
+  logparser.cpp
+  logparser.h
+  analysis.cpp
+  analysis.h
+)
+target_include_directories(phdlogview_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(phdlogview_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
+target_link_libraries(phdlogview_core PUBLIC ${wxWidgets_LIBRARIES} GSL::gsl GSL::gslcblas)
+if(MSVC)
+  target_compile_definitions(phdlogview_core PUBLIC _CRT_SECURE_NO_WARNINGS)
+  target_compile_options(phdlogview_core PUBLIC /utf-8)
+endif()
+
 set(SRC
   AnalysisWin.cpp
   AnalysisWin.h
@@ -93,8 +108,6 @@ set(SRC
   LogViewApp.h
   LogViewFrame.cpp
   LogViewFrame.h
-  logparser.cpp
-  logparser.h
 )
 
 if(WIN32)
@@ -103,14 +116,8 @@ endif()
 
 add_executable(phdlogview WIN32 MACOSX_BUNDLE ${SRC} ${FBSRC})
 
-target_include_directories(phdlogview PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(phdlogview PRIVATE _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
-target_link_libraries(phdlogview PRIVATE ${wxWidgets_LIBRARIES} GSL::gsl GSL::gslcblas)
-
-if(MSVC)
-  target_compile_definitions(phdlogview PRIVATE _CRT_SECURE_NO_WARNINGS)
-  target_compile_options(phdlogview PRIVATE /utf-8)
-endif()
+target_include_directories(phdlogview PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(phdlogview PRIVATE phdlogview_core)
 
 if(APPLE)
   set_target_properties(phdlogview PROPERTIES
@@ -131,6 +138,14 @@ add_custom_command(TARGET phdlogview POST_BUILD
     ${CMAKE_CURRENT_SOURCE_DIR}/README.txt
     $<TARGET_FILE_DIR:phdlogview>
 )
+
+#################################################################################
+# Tests
+
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()
 
 #################################################################################
 # Install
