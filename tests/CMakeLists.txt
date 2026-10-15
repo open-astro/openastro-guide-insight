@@ -20,6 +20,13 @@ target_link_libraries(phdlogview_tests PRIVATE phdlogview_core Catch2::Catch2)
 target_compile_definitions(phdlogview_tests PRIVATE
   TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
+set(PHDLOGVIEW_EXPECTED_WX_VERSION "" CACHE STRING
+  "If set, a test checks the build uses exactly this wxWidgets version")
+if(PHDLOGVIEW_EXPECTED_WX_VERSION)
+  target_compile_definitions(phdlogview_tests PRIVATE
+    PHDLOGVIEW_EXPECTED_WX_VERSION="${PHDLOGVIEW_EXPECTED_WX_VERSION}")
+endif()
+
 if(TARGET Catch2::Catch2 AND NOT COMMAND catch_discover_tests)
   list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 endif()
