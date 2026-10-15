@@ -1374,11 +1374,7 @@ void LogViewFrame::UpdateScrollbar()
 static void PaintCalibration(wxDC& dc, const Calibration *cal, wxWindow *graph)
 {
     dc.SetTextForeground(wxColour(80, 80, 80));
-#if defined(__WXOSX__)
-    dc.SetFont(wxSMALL_FONT->Smaller());
-#else
-    dc.SetFont(wxSWISS_FONT->Smaller());
-#endif
+    dc.SetFont(GraphLabelFont());
 
     int size = wxMin(graph->GetSize().GetWidth(), graph->GetSize().GetHeight());
     int x0 = graph->GetSize().GetWidth() / 2 - cal->display.xofs;
@@ -1491,11 +1487,7 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
     bool const radec = m_axes->GetSelection() == 0;
 
     dc.SetTextForeground(*wxLIGHT_GREY);
-#if defined(__WXOSX__)
-    dc.SetFont(wxSMALL_FONT->Smaller());
-#else
-    dc.SetFont(wxSWISS_FONT->Smaller());
-#endif
+    dc.SetFont(GraphLabelFont());
 
     dc.SetPen(*wxGREY_PEN);
     dc.DrawLine(0, y0, fullw, y0);
