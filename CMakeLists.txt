@@ -57,16 +57,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # the full static dependency list, such as PCRE2 for wxRegEx. Fall back to
 # CMake's FindwxWidgets module, which uses wx-config, for system packages.
 # No version in the CONFIG call: wxWidgets' package only accepts requests for
-# its own minor version, so the minimum is checked separately.
+# its own minor version, so the 3.2 minimum is checked separately.
 find_package(wxWidgets CONFIG QUIET COMPONENTS html core base)
 if(wxWidgets_FOUND)
-  if(wxWidgets_VERSION VERSION_LESS 3.0)
-    message(FATAL_ERROR "wxWidgets 3.0 or newer is required, found ${wxWidgets_VERSION}")
+  if(wxWidgets_VERSION VERSION_LESS 3.2)
+    message(FATAL_ERROR "wxWidgets 3.2 or newer is required, found ${wxWidgets_VERSION}")
   endif()
   set(PHDLOGVIEW_WX_LIBS wx::html wx::core wx::base)
   message(STATUS "Found wxWidgets ${wxWidgets_VERSION} (CMake package)")
 else()
-  find_package(wxWidgets 3.0 REQUIRED COMPONENTS html core base)
+  find_package(wxWidgets 3.2 REQUIRED COMPONENTS html core base)
   include(${wxWidgets_USE_FILE})
   set(PHDLOGVIEW_WX_LIBS ${wxWidgets_LIBRARIES})
 endif()
