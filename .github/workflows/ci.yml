@@ -31,10 +31,25 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build libwxgtk3.2-dev libgsl-dev
+          sudo apt-get install -y --no-install-recommends ninja-build libgtk-3-dev libgsl-dev
+
+      # Ubuntu packages an older wxWidgets 3.2, so build the pinned release.
+      - name: Restore wxWidgets build
+        id: wx-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/wx
+          key: wx-${{ matrix.runner }}-${{ hashFiles('vcpkg-ports/wxwidgets/vcpkg.json', 'vcpkg-ports/wxwidgets/portfile.cmake', 'scripts/build-wxwidgets.sh') }}
+
+      - name: Build wxWidgets
+        if: steps.wx-cache.outputs.cache-hit != 'true'
+        run: scripts/build-wxwidgets.sh ~/wx
 
       - name: Configure
-        run: cmake --preset linux
+        run: >
+          cmake --preset linux
+          -DCMAKE_PREFIX_PATH=$HOME/wx
+          -DPHDLOGVIEW_EXPECTED_WX_VERSION=$(cat ~/wx/wxwidgets-version.txt)
 
       - name: Build
         run: cmake --build --preset linux -- -k 0
@@ -109,7 +124,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}-${{ hashFiles('vcpkg.json', 'vcpkg-ports/**', 'cmake/triplets/**') }}
           restore-keys: |
             vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_BASELINE }}-
             vcpkg-${{ matrix.triplet }}-
