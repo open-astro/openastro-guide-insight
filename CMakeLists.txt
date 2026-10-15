@@ -2,6 +2,7 @@
 #  This file is part of phdlogview
 #
 #  Copyright (C) 2016 Andy Galasso
+#  Copyright (C) 2026 Open Astro contributors
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -16,241 +17,150 @@
 #  You should have received a copy of the GNU General Public License along
 #  with this program; if not, visit the http://fsf.org website.
 
-cmake_minimum_required (VERSION 3.24)
+cmake_minimum_required(VERSION 3.24)
 
-# this must appear very early in the file
-if (WINDOWS)
-  set(CMAKE_GENERATOR "Visual Studio 17" CACHE STRING INTERNAL "" FORCE)
-endif()
-
-if(COMMAND cmake_policy)
-  cmake_policy(SET CMP0003 NEW)
-  if (POLICY CMP0043)
-    cmake_policy(SET CMP0043 NEW)
-  endif()
-endif(COMMAND cmake_policy)
-
+# macOS: native Apple Silicon only. Must be set before project().
 if(APPLE)
-  if(NOT DEFINED CMAKE_OSX_ARCHITECTURES)
-    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS target architectures")
-  endif()
-  if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum OSX deployment version")
-  endif()
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+  set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS target architectures")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "26.0" CACHE STRING "Minimum macOS version")
 endif()
 
-project (phdlogview)
+# Windows + vcpkg static triplets: use the static CRT so no runtime DLLs ship.
+if(VCPKG_TARGET_TRIPLET MATCHES "-static$")
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
-set(srcdir ${CMAKE_SOURCE_DIR})
+project(phdlogview LANGUAGES C CXX)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-#include_directories(${srcdir})
-
-add_definitions(-D_USE_MATH_DEFINES)
-
-#if (WIN32)
-#  set(FIND_LIBRARY_USE_LIB64_PATHS FALSE)
-#endif()
+if(WIN32)
+  enable_language(RC)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Release' as none was specified.")
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-  # Set the possible values of build type for cmake-gui
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
-"MinSizeRel" "RelWithDebInfo")
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release MinSizeRel RelWithDebInfo)
 endif()
 
-include(CheckCXXCompilerFlag)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 #################################################################################
+# Dependencies
 #
-# general defines
-if(WIN32)
+# Windows and macOS release builds get wxWidgets and GSL from the vcpkg
+# manifest (vcpkg.json). Linux and local development builds can use system
+# packages. Either way the same find_package calls apply.
 
-  if(CMAKE_GENERATOR_PLATFORM STREQUAL "x64")
-    set(WINDOWS_ARCH "x64")
-  else()
-    set(WINDOWS_ARCH "x86")
+# Prefer wxWidgets' own CMake package (vcpkg installs it). Its targets carry
+# the full static dependency list, such as PCRE2 for wxRegEx. Fall back to
+# CMake's FindwxWidgets module, which uses wx-config, for system packages.
+# No version in the CONFIG call: wxWidgets' package only accepts requests for
+# its own minor version, so the 3.2 minimum is checked separately.
+find_package(wxWidgets CONFIG QUIET COMPONENTS html core base)
+if(wxWidgets_FOUND)
+  if(wxWidgets_VERSION VERSION_LESS 3.2)
+    message(FATAL_ERROR "wxWidgets 3.2 or newer is required, found ${wxWidgets_VERSION}")
   endif()
-
-elseif(NOT APPLE)
-  # c++11 options
-  check_cxx_compiler_flag(-std=c++11 HAS_CXX11_FLAG)
-  check_cxx_compiler_flag(-std=c++0x HAS_CXX0X_FLAG)
-
-  if(HAS_CXX11_FLAG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-  elseif(HAS_CXX0X_FLAG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-  endif()
-
-endif()
-
-if(WIN32)
-  # wxWidgets
-
-  set(wxWidgets_PREFIX_DIRECTORY $ENV{WXWIN} CACHE PATH "wxWidgets directory")
-
-  if(NOT wxWidgets_PREFIX_DIRECTORY OR NOT EXISTS ${wxWidgets_PREFIX_DIRECTORY})
-    message(FATAL_ERROR "The variable WXWIN should be defined and should point to a valid wxWindows installation path.")
-  endif()
-
-  set(wxWidgets_CONFIGURATION msw CACHE STRING "Set wxWidgets configuration")
-
-  set(wxWidgets_ROOT_DIR ${wxWidgets_PREFIX_DIRECTORY})
-  if(WINDOWS_ARCH STREQUAL "x64")
-    set(wxWidgets_LIB_DIR ${wxWidgets_ROOT_DIR}/lib/vc_x64_lib)
-  else()
-    set(wxWidgets_LIB_DIR ${wxWidgets_ROOT_DIR}/lib/vc_lib)
-  endif()
-  set(wxWidgets_USE_STATIC ON)
-  set(wxWidgets_USE_DEBUG OFF)
-  set(wxWidgets_USE_UNICODE OFF)
-  find_package(wxWidgets REQUIRED COMPONENTS propgrid base core aui adv html net)
-  include(${wxWidgets_USE_FILE})
-  message(${wxWidgets_USE_FILE})
+  set(PHDLOGVIEW_WX_LIBS wx::html wx::core wx::base)
+  message(STATUS "Found wxWidgets ${wxWidgets_VERSION} (CMake package)")
 else()
-  if(wxWidgets_PREFIX_DIRECTORY)
-    set(wxWidgets_CONFIG_OPTIONS --prefix=${wxWidgets_PREFIX_DIRECTORY})
-
-    find_program(wxWidgets_CONFIG_EXECUTABLE NAMES "wx-config" PATHS
-${wxWidgets_PREFIX_DIRECTORY}/bin NO_DEFAULT_PATH)
-    if(NOT wxWidgets_CONFIG_EXECUTABLE)
-      message(FATAL_ERROR "Cannot find wxWidgets_CONFIG_EXECUTABLE from the
-given directory ${wxWidgets_PREFIX_DIRECTORY}")
-    endif()
-  endif()
-
-  find_package(wxWidgets REQUIRED COMPONENTS aui core base adv html net)
-  if(NOT wxWidgets_FOUND)
-    message(FATAL_ERROR "WxWidget cannot be found. Please use wx-config
-prefix")
-  endif()
-  #if(APPLE)
-  #  set(PHD_LINK_EXTERNAL ${PHD_LINK_EXTERNAL} wx_osx_cocoau_aui-3.0)
-  #endif()
-  #message("wxLibraries ${wxWidgets_LIBRARIES}")
+  find_package(wxWidgets 3.2 REQUIRED COMPONENTS html core base)
+  include(${wxWidgets_USE_FILE})
+  set(PHDLOGVIEW_WX_LIBS ${wxWidgets_LIBRARIES})
 endif()
 
-set(APP_LINK_EXTERNAL ${APP_LINK_EXTERNAL} ${wxWidgets_LIBRARIES})
+find_package(GSL REQUIRED)
 
-set(SRC
-  ${srcdir}/AnalysisWin.cpp
-  ${srcdir}/AnalysisWin.h
-  ${srcdir}/LogViewApp.cpp
-  ${srcdir}/LogViewApp.h
-  ${srcdir}/LogViewFrame.cpp
-  ${srcdir}/LogViewFrame.h
-  ${srcdir}/logparser.cpp
-  ${srcdir}/logparser.h
-  ${srcdir}/phdlogview.ico
-  ${srcdir}/phdlogview.rc
-  ${srcdir}/small.ico
-)
+#################################################################################
+# wxFormBuilder generated UI code
 
-set (FBSRC
+option(HAVE_WXFB "Regenerate the UI code from phdlogview.fbp with wxFormBuilder" OFF)
+
+set(FBSRC
   ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h
 )
 
-set (HAVE_WXFB TRUE CACHE BOOL "whether to use wxformbuilder")
-
-if (HAVE_WXFB)
-
-  if (WIN32)
-    set (WXFB "C:\\Program Files (x86)\\wxFormBuilder\\wxFormBuilder.exe")
-    set (WXFB_GENERATE "/g")
-  else()
-    set (WXFB wxformbuilder)
-    set (WXFB_GENERATE "-g")
-  endif()
-
-  ADD_CUSTOM_COMMAND(
+if(HAVE_WXFB)
+  find_program(WXFB NAMES wxformbuilder wxFormBuilder
+    PATHS "C:/Program Files/wxFormBuilder" "C:/Program Files (x86)/wxFormBuilder"
+          "/Applications/wxFormBuilder.app/Contents/MacOS"
+    REQUIRED)
+  add_custom_command(
     OUTPUT ${FBSRC}
-    COMMAND ${WXFB} ${WXFB_GENERATE} ${srcdir}/phdlogview.fbp
+    COMMAND ${WXFB} -g ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
 else()
-  # no wxFormBuilder, use pre-generated files
-  configure_file(${srcdir}/generated/LogViewFrameBase.cpp ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp COPYONLY)
-  configure_file(${srcdir}/generated/LogViewFrameBase.h ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h COPYONLY)
+  configure_file(generated/LogViewFrameBase.cpp ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp COPYONLY)
+  configure_file(generated/LogViewFrameBase.h ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h COPYONLY)
 endif()
 
-set (ALL_SRC
-  ${SRC}
-  ${FBSRC}
+#################################################################################
+# Application
+
+set(SRC
+  AnalysisWin.cpp
+  AnalysisWin.h
+  LogViewApp.cpp
+  LogViewApp.h
+  LogViewFrame.cpp
+  LogViewFrame.h
+  logparser.cpp
+  logparser.h
 )
 
 if(WIN32)
-  add_executable(phdlogview WIN32 ${ALL_SRC})
-elseif(APPLE)
-  # MacOSX bundle definitions - used to generate Info.plist
-  set(MACOSX_BUNDLE_BUNDLE_NAME          phdlogview)
-  set(MACOSX_BUNDLE_GUI_IDENTIFIER       "com.adgsoftware.phdlogview" )
-  set(MACOSX_BUNDLE_ICON_FILE            phdlogview.ico )
-  set(MACOSX_BUNDLE_INFO_STRING          "PHD2 Log Viewer, Copyright 2016-2025 Andy Galasso" )
-  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "0.6.4" )
-  set(MACOSX_BUNDLE_LONG_VERSION_STRING  "0.6.4" )
-  set(MACOSX_BUNDLE_BUNDLE_VERSION       "0.6.4" )
-  set(MACOSX_BUNDLE_COPYRIGHT            "(C) 2016-2025 Andy Galasso" )
-
-  add_executable(phdlogview MACOSX_BUNDLE ${ALL_SRC})
-elseif(UNIX)
-  add_executable(phdlogview ${ALL_SRC})
+  list(APPEND SRC phdlogview.rc)
 endif()
 
-# ===== GSL =====
-if(WIN32)
-  set(gsl_ver "2.4.0.8788")
-  set(gsl_dir ${CMAKE_BINARY_DIR}/gsl-msvc-x86.${gsl_ver})
-  if(NOT EXISTS ${gsl_dir})
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E tar xf ${CMAKE_SOURCE_DIR}/3rdparty/gsl-msvc-x86.${gsl_ver}.zip --format=zip
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  endif()
-  add_definitions(-DGSL_DLL)
-  include_directories(${gsl_dir}/build/native)
-#  set(gsl_lib_dir ${gsl_dir}/build/native/dll/Win32/${CMAKE_BUILD_TYPE})  # requies vcruntime140d.dll
-  set(gsl_lib_dir ${gsl_dir}/build/native/dll/Win32/Release)
-  set(APP_LINK_EXTERNAL ${APP_LINK_EXTERNAL} ${gsl_lib_dir}/gsl.lib)
-  add_custom_command(TARGET phdlogview POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${gsl_lib_dir}/gsl.dll"
-      "${gsl_lib_dir}/cblas.dll"
-      "${CMAKE_SOURCE_DIR}/3rdparty/msvcp120.dll"
-      "${CMAKE_SOURCE_DIR}/3rdparty/msvcr120.dll"
-      "${CMAKE_SOURCE_DIR}/3rdparty/vcruntime140.dll"
-      $<TARGET_FILE_DIR:phdlogview>)
-else()
-  find_package(GSL REQUIRED)
-  if(APPLE)
-    # force static linking on OSX to avoid redistributing GSL .dylib files
-    # this is a hack... what's the real way to do this in CMake?
-    string(REPLACE ".dylib" ".a" GSL_LIBRARIES "${GSL_LIBRARIES}")
-    set(APP_LINK_EXTERNAL ${APP_LINK_EXTERNAL} ${GSL_LIBRARIES})
-    include_directories(${GSL_INCLUDE_DIR})
-  else()
-    target_link_libraries(phdlogview GSL::gsl GSL::gslcblas)
-  endif()
+add_executable(phdlogview WIN32 MACOSX_BUNDLE ${SRC} ${FBSRC})
+
+target_include_directories(phdlogview PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(phdlogview PRIVATE _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
+target_link_libraries(phdlogview PRIVATE ${PHDLOGVIEW_WX_LIBS} GSL::gsl GSL::gslcblas)
+
+if(MSVC)
+  target_compile_definitions(phdlogview PRIVATE _CRT_SECURE_NO_WARNINGS)
+  target_compile_options(phdlogview PRIVATE /utf-8)
 endif()
 
-target_compile_definitions( phdlogview PRIVATE "${wxWidgets_DEFINITIONS}" "HAVE_TYPE_TRAITS")
-target_compile_options(     phdlogview PRIVATE "${wxWidgets_CXX_FLAGS};")
-target_link_libraries(phdlogview ${APP_LINK_EXTERNAL})
-target_include_directories(phdlogview PRIVATE ${wxWidgets_INCLUDE_DIRS})
+if(APPLE)
+  set_target_properties(phdlogview PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME          phdlogview
+    MACOSX_BUNDLE_GUI_IDENTIFIER       "com.adgsoftware.phdlogview"
+    MACOSX_BUNDLE_ICON_FILE            phdlogview.ico
+    MACOSX_BUNDLE_INFO_STRING          "PHD2 Log Viewer, Copyright 2016-2025 Andy Galasso"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "0.6.5"
+    MACOSX_BUNDLE_LONG_VERSION_STRING  "0.6.5"
+    MACOSX_BUNDLE_BUNDLE_VERSION       "0.6.5"
+    MACOSX_BUNDLE_COPYRIGHT            "(C) 2016-2025 Andy Galasso"
+  )
+endif()
 
 add_custom_command(TARGET phdlogview POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_SOURCE_DIR}/LICENSE.txt"
-    "${CMAKE_SOURCE_DIR}/README.txt"
-    $<TARGET_FILE_DIR:phdlogview>)
+    ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.txt
+    $<TARGET_FILE_DIR:phdlogview>
+)
 
-if(UNIX AND NOT APPLE)
-  install(TARGETS phdlogview
-          RUNTIME DESTINATION bin)
-  install(FILES ${CMAKE_SOURCE_DIR}/phdlogview.png
-          DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pixmaps/ )
-  install(FILES ${CMAKE_SOURCE_DIR}/phdlogview.desktop
-          DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications/ )
+#################################################################################
+# Install
+
+include(GNUInstallDirs)
+
+if(APPLE)
+  install(TARGETS phdlogview BUNDLE DESTINATION .)
+elseif(WIN32)
+  install(TARGETS phdlogview RUNTIME DESTINATION .)
+  install(FILES LICENSE.txt README.txt DESTINATION .)
+else()
+  install(TARGETS phdlogview RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(FILES phdlogview.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps)
+  install(FILES phdlogview.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  install(FILES LICENSE.txt README.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif()
