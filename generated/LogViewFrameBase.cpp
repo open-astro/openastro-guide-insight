@@ -80,7 +80,6 @@ LogViewFrameBase::LogViewFrameBase( wxWindow* parent, wxWindowID id, const wxStr
 	sbSizer2 = new wxStaticBoxSizer( new wxStaticBox( panel8, wxID_ANY, wxT("Section heading") ), wxVERTICAL );
 	
 	m_sessionInfo = new wxTextCtrl( sbSizer2->GetStaticBox(), wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE|wxTE_READONLY );
-	m_sessionInfo->SetFont( wxFont( 8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Arial") ) );
 	m_sessionInfo->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_BTNFACE ) );
 	
 	sbSizer2->Add( m_sessionInfo, 1, wxALL|wxEXPAND, 5 );
