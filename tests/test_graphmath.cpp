@@ -95,3 +95,51 @@ TEST_CASE("Saturated frames still count as found", "[graph]")
     REQUIRE(runs.size() == 1);
     CHECK(runs[0] == IndexRun{ 0, 2 });
 }
+
+namespace {
+
+GuideSession::EntryVec Times(std::initializer_list<double> times)
+{
+    GuideSession::EntryVec v;
+    int frame = 1;
+    for (double t : times)
+    {
+        GuideEntry e{};
+        e.frame = frame++;
+        e.dt = (float) t;
+        v.push_back(e);
+    }
+    return v;
+}
+
+} // namespace
+
+TEST_CASE("Time maps to frame position with even frame spacing", "[graph]")
+{
+    auto e = Times({ 0., 2., 4., 6. });
+    CHECK(IndexAtTime(e, 0.) == 0.);
+    CHECK(IndexAtTime(e, 4.) == 2.);
+    CHECK(IndexAtTime(e, 5.) == 2.5);
+}
+
+TEST_CASE("Time maps to frame position with uneven frame spacing", "[graph]")
+{
+    // Upstream issue #9: labels assumed equal intervals. Here one frame took
+    // 6 s instead of 2 s, so 7 s is halfway between frames 2 and 3.
+    auto e = Times({ 0., 2., 4., 10., 12. });
+    CHECK(IndexAtTime(e, 7.) == 2.5);
+    CHECK(IndexAtTime(e, 11.) == 3.5);
+}
+
+TEST_CASE("Times outside the session clamp to its ends", "[graph]")
+{
+    auto e = Times({ 5., 7., 9. });
+    CHECK(IndexAtTime(e, 0.) == 0.);
+    CHECK(IndexAtTime(e, 100.) == 2.);
+}
+
+TEST_CASE("Time position of an empty or one-frame session", "[graph]")
+{
+    CHECK(IndexAtTime(Times({}), 3.) == 0.);
+    CHECK(IndexAtTime(Times({ 4. }), 3.) == 0.);
+}
