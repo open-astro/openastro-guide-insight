@@ -82,9 +82,8 @@
     },
     {
       "name": "win-x64",
-      "displayName": "Windows x64 release (vcpkg)",
+      "displayName": "Windows x64 release (vcpkg), newest installed Visual Studio",
       "inherits": "vcpkg",
-      "generator": "Visual Studio 17 2022",
       "architecture": {
         "value": "x64",
         "strategy": "set"
@@ -100,9 +99,8 @@
     },
     {
       "name": "win-arm64",
-      "displayName": "Windows ARM64 release (vcpkg)",
+      "displayName": "Windows ARM64 release (vcpkg), newest installed Visual Studio",
       "inherits": "vcpkg",
-      "generator": "Visual Studio 17 2022",
       "architecture": {
         "value": "ARM64",
         "strategy": "set"
