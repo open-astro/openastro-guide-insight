@@ -135,7 +135,7 @@ static double RaDrift(const GuideSession::EntryVec& entries)
     // estimate RA drift = (RA offset + sum of RA corrections) / time
 
     bool found = false;
-    double ra0, t0;
+    double ra0 = 0., t0 = 0.;
     auto it = entries.begin();
     for (; it != entries.end(); ++it)
     {
@@ -159,7 +159,8 @@ static double RaDrift(const GuideSession::EntryVec& entries)
             sum += it->radur ? it->raguide : 0.;
     }
 
-    double ra1, t1;
+    // the forward search found an included entry, so this search finds one too
+    double ra1 = ra0, t1 = t0;
     for (auto itr = entries.rbegin(); itr != entries.rend(); ++itr)
     {
         if (Include(*itr))

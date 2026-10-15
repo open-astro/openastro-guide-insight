@@ -25,7 +25,7 @@
 
 wxConfigBase *Config = 0;
 
-static void gsl_error_handler(const char *reason, const char *file, int line, int gsl_errno)
+static void gsl_error_handler(const char *WXUNUSED(reason), const char *WXUNUSED(file), int WXUNUSED(line), int WXUNUSED(gsl_errno))
 {
 #if defined(_MSC_VER)
     DebugBreak();

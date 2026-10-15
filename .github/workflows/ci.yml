@@ -34,7 +34,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends ninja-build libwxgtk3.2-dev libgsl-dev
 
       - name: Configure
-        run: cmake --preset linux
+        run: cmake --preset linux -DPHDLOGVIEW_WERROR=ON
 
       - name: Build
         run: cmake --build --preset linux
@@ -54,6 +54,29 @@ jobs:
           path: phdlogview-linux-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
+  sanitizers:
+    name: Linux ASan + UBSan
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libwxgtk3.2-dev libgsl-dev
+
+      - name: Configure
+        run: cmake --preset asan
+
+      - name: Build
+        run: cmake --build --preset asan
+
+      - name: Test
+        run: ctest --preset asan
+
   vcpkg:
     name: ${{ matrix.name }}
     strategy:
@@ -65,16 +88,19 @@ jobs:
             preset: macos-arm64
             triplet: arm64-osx-11
             artifact: phdlogview-macos-arm64
+            werror: "ON"
           - name: Windows x64
             runner: windows-latest
             preset: win-x64
             triplet: x64-windows-static
             artifact: phdlogview-windows-x64
+            werror: "OFF" # MSVC /W4 warnings not yet triaged
           - name: Windows ARM64
             runner: windows-11-arm
             preset: win-arm64
             triplet: arm64-windows-static
             artifact: phdlogview-windows-arm64
+            werror: "OFF" # MSVC /W4 warnings not yet triaged
     runs-on: ${{ matrix.runner }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
@@ -115,7 +141,7 @@ jobs:
             vcpkg-${{ matrix.triplet }}-
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset ${{ matrix.preset }} -DPHDLOGVIEW_WERROR=${{ matrix.werror }}
 
       - name: Upload vcpkg logs on failure
         if: failure()
