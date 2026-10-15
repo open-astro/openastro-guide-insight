@@ -26,6 +26,7 @@
 #include <wx/datetime.h>
 
 #include <stddef.h>
+#include <string>
 
 struct GuideSession;
 
@@ -59,5 +60,9 @@ struct GARun
     static bool CanAnalyze(const GuideSession& session, size_t begin, size_t end);
     void Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections);
 };
+
+// The periodogram as CSV text: a header row, then period (s), amplitude (px)
+// and amplitude (arc-seconds) per row.
+std::string FftCsv(const GARun& ga);
 
 #endif

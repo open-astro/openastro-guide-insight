@@ -383,14 +383,7 @@ void AnalysisWin::OnSaveCSV(wxCommandEvent& WXUNUSED(event))
         return;
     }
 
-    f.Write("Period (s),Amplitude (px),Amplitude (\")\n");
-    for (size_t i = 0; i < m_garun.nfft; i++)
-    {
-        f.Write(wxString::Format("%.4f,%.6f,%.6f\n",
-            m_garun.fftx[i],
-            m_garun.ffty[i],
-            m_garun.ffty[i] * m_garun.pixscale));
-    }
+    f.Write(FftCsv(m_garun));
 }
 
 static void HZoom(AnalysisWin *aw, double f, int center)

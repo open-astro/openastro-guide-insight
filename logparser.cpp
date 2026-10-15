@@ -20,6 +20,12 @@
 #include "logparser.h"
 
 #include <algorithm>
+#include <clocale>
+#include <cstdlib>
+#include <cstring>
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
 #include <wx/tokenzr.h>
 #include <wx/txtstrm.h>
 #include <wx/wfstream.h>
@@ -81,12 +87,26 @@ inline static bool toLong(const char *s, long *p)
     return false;
 }
 
+// PHD2 always writes a decimal point, so parse in the "C" locale rather than
+// the process locale. Plain strtod stops at the '.' under a decimal-comma
+// locale, which GTK installs on Linux at startup.
+static double StrtodC(const char *s, char **endptr)
+{
+#ifdef _WIN32
+    static const _locale_t c_locale = _create_locale(LC_NUMERIC, "C");
+    return _strtod_l(s, endptr, c_locale);
+#else
+    static const locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t) 0);
+    return strtod_l(s, endptr, c_locale);
+#endif
+}
+
 inline static bool toDouble(const char *s, double *p)
 {
     if (s)
     {
         char *endptr;
-        double d = strtod(s, &endptr);
+        double d = StrtodC(s, &endptr);
         if (endptr != s)
         {
             *p = d;

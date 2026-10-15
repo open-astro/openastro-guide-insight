@@ -23,6 +23,7 @@
 #include "logparser.h"
 
 #include <algorithm>
+#include <charconv>
 #include <math.h>
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_errno.h>
@@ -414,3 +415,26 @@ void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool 
     delete[] dec;
 }
 
+
+// Fixed-point text with a decimal point regardless of the C locale.
+static void AppendFixed(std::string& out, double v, int precision)
+{
+    char buf[64];
+    auto res = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::fixed, precision);
+    out.append(buf, res.ptr);
+}
+
+std::string FftCsv(const GARun& ga)
+{
+    std::string out("Period (s),Amplitude (px),Amplitude (\")\n");
+    for (size_t i = 0; i < ga.nfft; i++)
+    {
+        AppendFixed(out, ga.fftx[i], 4);
+        out += ',';
+        AppendFixed(out, ga.ffty[i], 6);
+        out += ',';
+        AppendFixed(out, ga.ffty[i] * ga.pixscale, 6);
+        out += '\n';
+    }
+    return out;
+}
