@@ -23,7 +23,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "comma_locale.h"
+
 #include <cmath>
+#include <sstream>
 #include <fstream>
 
 using Catch::Matchers::WithinAbs;
@@ -191,4 +194,35 @@ TEST_CASE("Guiding Assistant analysis runs on a real session", "[analysis]")
     }
     for (size_t i = 1; i < ga.nfft; i++)
         CHECK(ga.fftx[i] > ga.fftx[i - 1]); // periods ascend
+}
+
+TEST_CASE("Frequency analysis CSV uses a decimal point in every locale", "[analysis]")
+{
+    GuideSession s = SineSession(481, 120., 2., 0.);
+    GARun ga;
+    ga.Analyze(s, 0, s.entries.size(), false);
+    ga.pixscale = 6.45;
+
+    CommaDecimalLocale comma;
+    if (!comma.Active())
+        SKIP("no locale with a decimal comma is installed");
+
+    std::istringstream csv(FftCsv(ga));
+    std::string line;
+    REQUIRE(std::getline(csv, line));
+    CHECK(line == "Period (s),Amplitude (px),Amplitude (\")");
+
+    size_t rows = 0;
+    while (std::getline(csv, line))
+    {
+        ++rows;
+        // three fields: period, amplitude in pixels, amplitude in arc-seconds
+        REQUIRE(std::count(line.begin(), line.end(), ',') == 2);
+    }
+    CHECK(rows == ga.nfft);
+
+    std::istringstream first(FftCsv(ga));
+    std::getline(first, line); // header
+    std::getline(first, line);
+    CHECK(line.find('.') != std::string::npos);
 }
