@@ -211,6 +211,7 @@ struct GuideLog
     typedef std::vector<LogSectionLoc> SectionLocVec;
 
     std::string phd_version;
+    bool is_debug_log = false; // a PHD2 debug log, not a guide log
     SessionVec sessions;
     CalibrationVec calibrations;
     SectionLocVec sections;
