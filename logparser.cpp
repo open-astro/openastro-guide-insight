@@ -530,6 +530,7 @@ static void FixupNonMonotonic(GuideLog& log)
 bool LogParser::Parse(std::istream& is, GuideLog& log)
 {
     log.phd_version.clear();
+    log.is_debug_log = false;
     log.sessions.clear();
     log.calibrations.clear();
     log.sections.clear();
@@ -578,6 +579,14 @@ redo:
                 cal = &log.calibrations[log.calibrations.size() - 1];
                 cal->starts.ParseISOCombined(datestr, ' ');
                 goto redo;
+            }
+
+            // A debug log's header says "PHD2 version X begins execution with:",
+            // after a time stamp and thread id. Guide logs never contain it.
+            if (ln.find(" PHD2 version ") != std::string::npos &&
+                ln.find(" execution with:") != std::string::npos)
+            {
+                log.is_debug_log = true;
             }
 
             if (StartsWith(ln, VERSION_PREFIX))
