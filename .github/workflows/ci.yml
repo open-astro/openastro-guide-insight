@@ -94,13 +94,13 @@ jobs:
             preset: win-x64
             triplet: x64-windows-static
             artifact: phdlogview-windows-x64
-            werror: "OFF" # MSVC /W4 warnings not yet triaged
+            werror: "ON"
           - name: Windows ARM64
             runner: windows-11-arm
             preset: win-arm64
             triplet: arm64-windows-static
             artifact: phdlogview-windows-arm64
-            werror: "OFF" # MSVC /W4 warnings not yet triaged
+            werror: "ON"
     runs-on: ${{ matrix.runner }}
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg

@@ -351,9 +351,9 @@ void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool 
     double *pdecc = &decc[0];
     while (prac < &rac[n])
     {
-        double t = *pt++;
-        *prac++ = *pra++ - lR(t);
-        *pdecc++ = *pdec++ - lD(t);
+        double tt = *pt++;
+        *prac++ = *pra++ - lR(tt);
+        *pdecc++ = *pdec++ - lD(tt);
     }
 
     // interpolate RA to get uniform samples for FFT

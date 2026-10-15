@@ -1530,24 +1530,24 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
             double dt0 = m_session->entries[i0].dt;
             double dt1 = m_session->entries[i1].dt;
             double tspan = dt1 - dt0;
-            int x0 = (int)(((double)i0 + 0.5) * ginfo.hscale) - ginfo.xofs;
+            int tick_x0 = (int)(((double)i0 + 0.5) * ginfo.hscale) - ginfo.xofs;
             int x1 = (int)(((double)i1 + 0.5) * ginfo.hscale) - ginfo.xofs;
-            double r = (double)(x1 - x0) / tspan; // pixels per second
+            double r = (double)(x1 - tick_x0) / tspan; // pixels per second
             int secs = (int)(ceil(80.0 / (r * 60.0)) * 60.0); // seconds per tick
             wxDateTime ti0(m_session->starts + wxTimeSpan(0, 0, 0, (wxLongLong)(dt0 * 1000.0)));
             wxDateTime t0(ti0);
             time_t ticks = ((t0.GetTicks() + secs - 1) / secs) * secs;
             t0.Set(ticks); // time of first tick
-            double t = (double)(t0 - ti0).GetMilliseconds().GetValue() / 1000.0;
+            double tick_t = (double)(t0 - ti0).GetMilliseconds().GetValue() / 1000.0;
             wxDateTime t1(m_session->starts + wxTimeSpan(0, 0, 0, (wxLongLong)(dt1 * 1000.0)));
             double tend = (double)(t1 - ti0).GetMilliseconds().GetValue() / 1000.0;
 
             dc.SetPen(*wxGREY_PEN);
-            for (; t < tend; t += secs)
+            for (; tick_t < tend; tick_t += secs)
             {
-                int x = (int)((double) x0 + r * t);
+                int x = (int)((double) tick_x0 + r * tick_t);
                 dc.DrawLine(x, 0, x, 10);
-                wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(t * 1000.0)));
+                wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(tick_t * 1000.0)));
                 dc.DrawText(wxt.Format("%H:%M"), x + 3, 1);
             }
         }
@@ -1763,8 +1763,7 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
     // excluded sections
     if (i1 >= i0)
     {
-        bool included = entries[i0].included;
-        bool prev_included = included;
+        bool prev_included = entries[i0].included;
         unsigned int e0 = i0;
 
         wxGraphicsContext *gc = 0;
@@ -1782,9 +1781,9 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
                 }
                 if (gc)
                 {
-                    int x0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
+                    int rx0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
                     int x1 = (int)((double)(i - 1.0 + 0.25) * ginfo.hscale) - ginfo.xofs;
-                    gc->DrawRectangle(x0, 0, x1 - x0 + 1, m_graph->GetSize().GetHeight());
+                    gc->DrawRectangle(rx0, 0, x1 - rx0 + 1, m_graph->GetSize().GetHeight());
                 }
             }
             else if (!included && prev_included)
@@ -1804,9 +1803,9 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
             }
             if (gc)
             {
-                int x0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
+                int rx0 = (int)((double)(e0 - 0.25) * ginfo.hscale) - ginfo.xofs;
                 int x1 = (int)((double)(i1 + 0.25) * ginfo.hscale) - ginfo.xofs;
-                gc->DrawRectangle(x0, 0, x1 - x0 + 1, m_graph->GetSize().GetHeight());
+                gc->DrawRectangle(rx0, 0, x1 - rx0 + 1, m_graph->GetSize().GetHeight());
             }
         }
 
@@ -1816,14 +1815,14 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
     // events
     if (m_events->IsChecked())
     {
-        int i1 = std::min((int)entries.size(), (int)floor(ginfo.i1));
+        int last = std::min((int)entries.size(), (int)floor(ginfo.i1));
         const GuideSession::InfoVec& infos = m_session->infos;
         int prev_end = -999999;
         int row = 1;
         for (auto it = infos.begin(); it != infos.end(); ++it)
         {
             const auto& info = *it;
-            if (info.idx > i1)
+            if (info.idx > last)
                 break;
             wxString s = info.repeats > 1 ? wxString::Format("%d x %s", info.repeats, info.info) : wxString(info.info);
             int width = dc.GetTextExtent(s).x;
