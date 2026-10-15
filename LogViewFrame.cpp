@@ -42,6 +42,7 @@
 #include <wx/wupdlock.h>
 
 #include <algorithm>
+#include <climits>
 #include <fstream>
 #include <iomanip>
 #include <math.h>
@@ -1547,12 +1548,24 @@ void LogViewFrame::OnPaintGraph(wxPaintEvent& WXUNUSED(event))
             double tend = (double)(t1 - ti0).GetMilliseconds().GetValue() / 1000.0;
 
             dc.SetPen(*wxGREY_PEN);
+            int labelEnd = INT_MIN; // right edge of the last label drawn
             for (; tick_t < tend; tick_t += secs)
             {
-                int x = (int)((double) tick_x0 + r * tick_t);
+                // place the tick where its time falls between the frames
+                // around it; frame intervals are not uniform (issue #18)
+                double idx = IndexAtTime(m_session->entries, dt0 + tick_t);
+                int x = (int)(idx * ginfo.hscale) - ginfo.xofs;
                 dc.DrawLine(x, 0, x, 10);
-                wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(tick_t * 1000.0)));
-                dc.DrawText(wxt.Format("%H:%M"), x + 3, 1);
+
+                // across a pause in guiding several ticks land together;
+                // label only the first so the text does not overlap
+                if (x + 3 > labelEnd)
+                {
+                    wxDateTime wxt(ti0 + wxTimeSpan(0, 0, 0, (wxLongLong)(tick_t * 1000.0)));
+                    wxString label = wxt.Format("%H:%M");
+                    dc.DrawText(label, x + 3, 1);
+                    labelEnd = x + 3 + dc.GetTextExtent(label).GetWidth() + 4;
+                }
             }
         }
     }
