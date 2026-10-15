@@ -32,6 +32,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build libgtk-3-dev libgsl-dev libpcre2-dev zlib1g-dev libpng-dev libjpeg-dev libtiff-dev libexpat1-dev
+          # a decimal-comma locale for the locale-independence tests
+          sudo locale-gen de_DE.UTF-8
 
       # Ubuntu packages an older wxWidgets 3.2, so build the pinned release.
       - name: Restore wxWidgets build
@@ -83,6 +85,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build libgtk-3-dev libgsl-dev libpcre2-dev zlib1g-dev libpng-dev libjpeg-dev libtiff-dev libexpat1-dev
+          # a decimal-comma locale for the locale-independence tests
+          sudo locale-gen de_DE.UTF-8
 
       - name: Restore wxWidgets build
         id: wx-cache
