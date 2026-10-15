@@ -63,7 +63,7 @@ jobs:
           - name: macOS arm64
             runner: macos-15
             preset: macos-arm64
-            triplet: arm64-osx
+            triplet: arm64-osx-11
             artifact: phdlogview-macos-arm64
           - name: Windows x64
             runner: windows-latest
