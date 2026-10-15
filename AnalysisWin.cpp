@@ -596,11 +596,7 @@ static void PaintDrift(AnalysisWin *aw, const GARun& ga, wxDC& dc)
     {
         enum { MINSEP = 40 };
         dc.SetTextForeground(*wxLIGHT_GREY);
-#if defined(__WXOSX__)
-        dc.SetFont(wxSMALL_FONT->Smaller());
-#else
-        dc.SetFont(wxSWISS_FONT->Smaller());
-#endif
+        dc.SetFont(GraphLabelFont());
         dc.SetPen(wxPen(wxColour(80, 80, 80), 1, wxPENSTYLE_DOT));
         double const dt = s_drpos.T(MINSEP) - s_drpos.T(0);
         double const incr = pow(10.0, ceil(log10(dt)));
@@ -726,11 +722,7 @@ static void PaintFFT(AnalysisWin *aw, const GARun& ga, wxDC& dc)
     // x grid
     {
         dc.SetTextForeground(*wxLIGHT_GREY);
-#if defined(__WXOSX__)
-        dc.SetFont(wxSMALL_FONT->Smaller());
-#else
-        dc.SetFont(wxSWISS_FONT->Smaller());
-#endif
+        dc.SetFont(GraphLabelFont());
         dc.SetPen(wxPen(wxColour(60, 60, 60), 1, wxPENSTYLE_SOLID));
         double p0 = s_fftpos.P(s_fftpos.x0);
         double p1 = s_fftpos.P(s_fftpos.x1);
