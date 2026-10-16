@@ -32,7 +32,8 @@ add_executable(guideinsight_tests
 target_link_libraries(guideinsight_tests PRIVATE guideinsight_core Catch2::Catch2)
 guideinsight_warnings(guideinsight_tests)
 target_compile_definitions(guideinsight_tests PRIVATE
-  TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+  TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+  GUIDEINSIGHT_PROJECT_VERSION="${PROJECT_VERSION}")
 
 set(GUIDEINSIGHT_EXPECTED_WX_VERSION "" CACHE STRING
   "If set, a test checks the build uses exactly this wxWidgets version")
@@ -52,6 +53,9 @@ catch_discover_tests(guideinsight_tests DISCOVERY_MODE PRE_TEST)
 if(APPLE)
   add_test(NAME macos_app_is_arm64_only
     COMMAND sh -c "test \"$(lipo -archs \"$1\")\" = arm64" _ $<TARGET_FILE:guideinsight>)
+  add_test(NAME macos_app_version_is_the_project_version
+    COMMAND sh -c "test \"$(plutil -extract CFBundleShortVersionString raw \"$1\")\" = ${PROJECT_VERSION}"
+      _ $<TARGET_BUNDLE_CONTENT_DIR:guideinsight>/Info.plist)
   add_test(NAME macos_app_minimum_is_26
     COMMAND sh -c "vtool -show-build \"$1\" | grep -q -E 'minos 26\\.0$'" _ $<TARGET_FILE:guideinsight>)
 endif()

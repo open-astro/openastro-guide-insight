@@ -30,6 +30,7 @@
 #include "icons.h"
 #include "labels.h"
 #include "timeline.h"
+#include "version.h"
 
 #include <wx/aboutdlg.h>
 #include <wx/busyinfo.h>
@@ -53,7 +54,6 @@
 #include <fstream>
 
 #define APP_NAME "OpenAstro Guide Insight"
-#define APP_VERSION_STR "0.6.5"
 
 namespace {
 
@@ -622,7 +622,7 @@ void MainFrame::OnAbout(wxCommandEvent&)
 {
     wxAboutDialogInfo info;
     info.SetName(APP_NAME);
-    info.SetVersion(APP_VERSION_STR);
+    info.SetVersion(GUIDEINSIGHT_VERSION);
     info.SetDescription("See and analyze your PHD2 guide logs.\nBased on PHD2 Log Viewer by Andy Galasso.");
     info.SetCopyright("(C) 2016-2020 Andy Galasso\n(C) 2026 OpenAstro contributors");
     info.SetWebSite("https://github.com/open-astro/openastro-guide-insight");

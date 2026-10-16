@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "OpenAstro Guide Insight"
-#define MyAppVersion "@VERSION@"
+#define MyAppVersion "@PROJECT_VERSION@"
 #define MyAppPublisher "OpenAstro"
 #define MyAppURL "https://github.com/open-astro/openastro-guide-insight"
 #define MyAppExeName "OpenAstroGuideInsight.exe"

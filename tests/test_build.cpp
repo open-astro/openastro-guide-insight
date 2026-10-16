@@ -17,10 +17,13 @@
  *  with this program; if not, visit the http://fsf.org website.
  */
 
+#include "version.h"
+
 #include <catch2/catch_test_macros.hpp>
 #include <wx/version.h>
 
 #include <sstream>
+#include <string>
 
 // MSVC only reports the real standard in __cplusplus with /Zc:__cplusplus;
 // _MSVC_LANG is always accurate there.
@@ -45,3 +48,11 @@ TEST_CASE("Built against the pinned wxWidgets version", "[build]")
     CHECK(actual.str() == GUIDEINSIGHT_EXPECTED_WX_VERSION);
 }
 #endif
+
+// The version is written once, in CMakeLists.txt's project() call. The
+// tests are built with it passed in separately, so a stale or hand-edited
+// version.h shows up here.
+TEST_CASE("The app's version is the project's version", "[build]")
+{
+    CHECK(std::string(GUIDEINSIGHT_VERSION) == GUIDEINSIGHT_PROJECT_VERSION);
+}

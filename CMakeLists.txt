@@ -30,7 +30,8 @@ if(VCPKG_TARGET_TRIPLET MATCHES "-static$")
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-project(guideinsight LANGUAGES C CXX)
+# The app's version: the only place it is written.
+project(guideinsight VERSION 0.6.5 LANGUAGES C CXX)
 
 if(WIN32)
   enable_language(RC)
@@ -95,6 +96,13 @@ find_package(GSL REQUIRED)
 #################################################################################
 # Application
 
+# version.h carries the project version into the code, and the installer
+# script gets it the same way.
+configure_file(version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
+if(WIN32)
+  configure_file(openastro-guide-insight-x64.iss.in ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.iss @ONLY)
+endif()
+
 # Parser and analysis code, independent of the GUI so it can be unit tested.
 add_library(guideinsight_core STATIC
   logparser.cpp
@@ -128,7 +136,7 @@ add_library(guideinsight_core STATIC
   settingsmigration.cpp
   settingsmigration.h
 )
-target_include_directories(guideinsight_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(guideinsight_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(guideinsight_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
 target_link_libraries(guideinsight_core PUBLIC ${GUIDEINSIGHT_WX_LIBS} GSL::gsl GSL::gslcblas)
 guideinsight_warnings(guideinsight_core)
@@ -205,9 +213,9 @@ if(APPLE)
     MACOSX_BUNDLE_GUI_IDENTIFIER       "org.openastro.guideinsight"
     MACOSX_BUNDLE_ICON_FILE            openastro-guide-insight.ico
     MACOSX_BUNDLE_INFO_STRING          "OpenAstro Guide Insight, a fork of PHD2 Log Viewer"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "0.6.5"
-    MACOSX_BUNDLE_LONG_VERSION_STRING  "0.6.5"
-    MACOSX_BUNDLE_BUNDLE_VERSION       "0.6.5"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_LONG_VERSION_STRING  "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION       "${PROJECT_VERSION}"
     MACOSX_BUNDLE_COPYRIGHT            "(C) 2016-2020 Andy Galasso, (C) 2026 OpenAstro contributors"
   )
 endif()
