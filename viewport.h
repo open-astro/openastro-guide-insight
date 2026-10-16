@@ -103,6 +103,10 @@ enum class XAxis { Frames, Time };
 // Where entry i sits on the x-axis.
 double AxisPosition(const GuideSession::EntryVec& entries, size_t i, XAxis axis);
 
+// Where a fractional entry index sits on the x-axis. On a time axis it
+// interpolates between frames, and clamps to the first and last.
+double PositionAtIndex(const GuideSession::EntryVec& entries, double index, XAxis axis);
+
 // The entry at an x-axis position, as a fractional index.
 double IndexAtPosition(const GuideSession::EntryVec& entries, double position, XAxis axis);
 

@@ -204,6 +204,27 @@ TEST_CASE("Including or excluding all frames ignores the selection", "[document]
     CHECK(doc.Session()->rms_ra > 0.);
 }
 
+TEST_CASE("Frames can be excluded and included without selecting them", "[document]")
+{
+    Document doc = RealLog();
+    doc.Select(2);
+    doc.IncludeAll(true);
+    doc.SetSelection(IndexRun{ 0, 9 });
+    doc.IncludeFrames(IndexRun{ 50, 59 }, false);
+    CHECK(Excluded(*doc.Session()) == 10);
+    CHECK(doc.Selection()->first == 0); // the selection stays
+    doc.IncludeFrames(IndexRun{ 55, 70 }, true);
+    CHECK(Excluded(*doc.Session()) == 5);
+}
+
+TEST_CASE("A new session view has not been fitted vertically", "[document]")
+{
+    Document doc = Load(OneSession(10, 2., 4.));
+    CHECK_FALSE(doc.View()->verticalFitted);
+    doc.FitVertical(300.);
+    CHECK(doc.View()->verticalFitted);
+}
+
 TEST_CASE("A calibration has no selection, statistics or view", "[document]")
 {
     Document doc = RealLog();
