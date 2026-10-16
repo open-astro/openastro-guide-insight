@@ -22,6 +22,7 @@ add_executable(guideinsight_tests
   test_selection.cpp
   test_document.cpp
   test_labels.cpp
+  test_appsettings.cpp
   test_exclusion.cpp
   test_settingsmigration.cpp
 )

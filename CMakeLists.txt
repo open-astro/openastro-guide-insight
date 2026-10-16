@@ -141,6 +141,8 @@ add_library(guideinsight_core STATIC
   document.h
   labels.cpp
   labels.h
+  appsettings.cpp
+  appsettings.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
