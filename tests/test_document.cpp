@@ -22,6 +22,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -288,6 +290,26 @@ TEST_CASE("Fitting the vertical view uses the largest offset", "[document]")
     CHECK(MaxOffset(*doc.Session()) == Approx(4.));
     doc.FitVertical(300.);
     CHECK(doc.View()->vertical.Scale() == Approx(35.));
+}
+
+TEST_CASE("Fitting the vertical view leaves out excluded frames", "[document]")
+{
+    // settling after a dither can be far larger than the guiding itself
+    Document doc = RealLog();
+    doc.Select(1);
+    const GuideSession& s = *doc.Session();
+    double included = 0.;
+    for (const auto& e : s.entries)
+        if (e.included)
+            included = std::max({ included, (double) fabs(e.raraw), (double) fabs(e.decraw) });
+    CHECK(MaxOffset(s) == Approx(included));
+}
+
+TEST_CASE("With every frame excluded, fitting uses them all", "[document]")
+{
+    Document doc = Load(OneSession(10, 2., 4.));
+    doc.IncludeAll(false);
+    CHECK(MaxOffset(*doc.Session()) == Approx(4.));
 }
 
 TEST_CASE("Zooming the vertical view scales the current session", "[document]")
