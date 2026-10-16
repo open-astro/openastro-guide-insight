@@ -26,6 +26,7 @@
 
 #include "appsettings.h"
 #include "assessment.h"
+#include "nights.h"
 #include "document.h"
 #include "sessiondetails.h"
 #include "theme.h"
@@ -60,6 +61,7 @@ class Inspector : public wxScrolledWindow
     Section m_assessment;
     Assessment m_shown;           // what the assessment section shows
     bool m_assessed = false;
+    std::optional<NightComparison> m_comparison; // with an earlier night
     // text that wraps to the inspector's width, with its unwrapped label and
     // how far it is indented
     struct Wrapped
@@ -132,6 +134,9 @@ public:
     std::function<void(bool include)> onIncludeAll;
     // The assessment's "Show on the timeline" link for a run of frames.
     std::function<void(const IndexRun&)> onShowFrames;
+
+    // Tonight's guiding against an earlier night, shown in the assessment.
+    void SetComparison(const std::optional<NightComparison>& comparison);
 
     // Shows what the document's current section and selection hold.
     void ShowDocument(const Document& doc, const AppSettings& settings);
