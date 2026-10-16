@@ -133,6 +133,8 @@ add_library(guideinsight_core STATIC
   ticks.h
   viewport.cpp
   viewport.h
+  sessiondetails.cpp
+  sessiondetails.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
