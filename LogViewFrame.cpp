@@ -20,6 +20,7 @@
 #include "LogViewFrame.h"
 #include "LogViewApp.h"
 #include "AnalysisWin.h"
+#include "exclusion.h"
 #include "graphmath.h"
 #include "logparser.h"
 
@@ -276,12 +277,6 @@ static wxString durStr(double dur)
     return s;
 }
 
-inline static void IncludeRange(GuideSession::EntryVec& entries, bool include, unsigned int i = 0, unsigned int i1 = (unsigned int)-1)
-{
-    for (auto it = entries.begin() + i; i < i1 && it != entries.end(); ++it, ++i)
-        it->included = include;
-}
-
 inline static void IncludeAll(GuideSession::EntryVec& entries)
 {
     IncludeRange(entries, true);
@@ -292,96 +287,13 @@ inline static void IncludeNone(GuideSession::EntryVec& entries)
     IncludeRange(entries, false);
 }
 
-static void ExcludeSettlingByAPI(GuideSession *session)
-{
-    bool settling = false;
-    int start_idx = 0;
-    auto& infos = session->infos;
-    auto& entries = session->entries;
-
-    for (auto it = infos.begin(); it != infos.end(); ++it)
-    {
-        if (settling)
-        {
-            if (it->info.find("Settling complete") != wxString::npos || it->info.find("Settling fail") != wxString::npos)
-            {
-                settling = false;
-                IncludeRange(entries, false, start_idx, it->idx);
-            }
-        }
-        else
-        {
-            if (it->info.find("Settling start") != wxString::npos)
-            {
-                settling = true;
-                start_idx = it->idx;
-            }
-        }
-    }
-    if (settling)
-        IncludeRange(entries, false, start_idx);
-}
-
-static void ExcludeSettlingByDistance(GuideSession *session, const SettleParams& params)
-{
-    auto& infos = session->infos;
-    auto& entries = session->entries;
-    double lim2 = params.pixels * params.pixels;
-
-    for (auto it = infos.begin(); it != infos.end(); ++it)
-    {
-        if (it->info.find("DITHER") != wxString::npos)
-        {
-            if (it->idx >= (int)entries.size())
-                break;
-            int start_idx = it->idx;
-            auto eit = entries.begin() + it->idx;
-            double start_time = eit->dt;
-            bool close = false;
-            bool settled = false;
-            int end_idx = start_idx;
-
-            for (; eit != entries.end(); ++eit, ++end_idx)
-            {
-                double dx = eit->dx;
-                double dy = eit->dy;
-                double d2 = dx * dx + dy * dy;
-                double t = eit->dt;
-                if (d2 < lim2)
-                {
-                    if (!close)
-                    {
-                        close = true;
-                        start_time = t;
-                    }
-                    else
-                    {
-                        double elapsed = t - start_time;
-                        if (elapsed > params.seconds)
-                        {
-                            settled = true;
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    close = false;
-                }
-            }
-            if (settled)
-                IncludeRange(entries, false, start_idx, end_idx);
-        }
-    }
-}
-
 static void ExcludeSettling(GuideSession *session)
 {
     if (s_settings.excludeByServer)
-        ExcludeSettlingByAPI(session);
+        ExcludeSettlingByServer(*session);
 
     if (s_settings.excludeParametric)
-        ExcludeSettlingByDistance(session, s_settings.settle);
+        ExcludeSettlingByDistance(*session, s_settings.settle);
 }
 
 void LogViewFrame::OpenLog(const wxString& filename)

@@ -21,6 +21,7 @@
 #define __LogViewFrame__
 
 #include "LogViewFrameBase.h"
+#include "exclusion.h"
 
 #include <wx/timer.h>
 
@@ -138,11 +139,6 @@ struct PointArray
 };
 extern PointArray s_tmp;
 
-struct SettleParams
-{
-    double pixels;
-    double seconds;
-};
 
 struct Settings
 {
