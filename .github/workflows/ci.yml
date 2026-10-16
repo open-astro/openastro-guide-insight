@@ -62,7 +62,8 @@ jobs:
         run: ctest --preset linux
 
       - name: Install
-        run: DESTDIR=${{ github.workspace }}/stage cmake --install out/build/linux
+        # the base preset's install folder would override the linux preset's /usr
+        run: DESTDIR=${{ github.workspace }}/stage cmake --install out/build/linux --prefix /usr
 
       - name: Package AppImage
         run: |
