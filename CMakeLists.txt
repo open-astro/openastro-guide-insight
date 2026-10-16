@@ -135,6 +135,8 @@ add_library(guideinsight_core STATIC
   viewport.h
   sessiondetails.cpp
   sessiondetails.h
+  selection.cpp
+  selection.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
