@@ -1,0 +1,325 @@
+/*
+ *  This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
+ *
+ *  Copyright (C) 2026 Open Astro contributors
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, visit the http://fsf.org website.
+ */
+
+#include "Inspector.h"
+
+#include "SectionHeader.h"
+#include "SegmentedControl.h"
+#include "labels.h"
+#include "sessiondetails.h"
+
+#include <wx/button.h>
+#include <wx/checkbox.h>
+#include <wx/panel.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <wx/wupdlock.h>
+
+#include <algorithm>
+#include <vector>
+
+namespace {
+
+wxString U(const std::string& utf8)
+{
+    return wxString::FromUTF8(utf8);
+}
+
+wxFlexGridSizer *FieldGrid()
+{
+    auto grid = new wxFlexGridSizer(2, wxSize(12, 4));
+    grid->AddGrowableCol(1, 1);
+    return grid;
+}
+
+} // namespace
+
+void Inspector::Section::Show(bool show)
+{
+    header->Show(show);
+    body->Show(show && header->IsOpen());
+}
+
+Inspector::Inspector(wxWindow *parent)
+    : wxScrolledWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL | wxBORDER_NONE, "Inspector"),
+      m_palette(CurrentPalette())
+{
+    SetScrollRate(0, FromDIP(10));
+    auto sizer = new wxBoxSizer(wxVERTICAL);
+    SetSizer(sizer);
+
+    m_empty = Secondary(new wxStaticText(this, wxID_ANY, "No section selected"));
+    sizer->Add(m_empty, 0, wxALL, FromDIP(14));
+
+    // Summary
+    m_summary = AddSection("Summary");
+    {
+        wxWindow *p = m_summary.body;
+        auto s = new wxBoxSizer(wxVERTICAL);
+        m_total = new wxStaticText(p, wxID_ANY, wxEmptyString);
+        m_total->SetFont(GetFont().Scaled(2.f).Bold());
+        m_alt = Secondary(new wxStaticText(p, wxID_ANY, wxEmptyString));
+        s->Add(m_total);
+        s->Add(m_alt, 0, wxBOTTOM, FromDIP(8));
+        auto grid = FieldGrid();
+        m_ra = AddField(p, grid, "RA RMS");
+        m_dec = AddField(p, grid, "Dec RMS");
+        m_peak = AddField(p, grid, "Peak");
+        m_elongation = AddField(p, grid, "Elongation");
+        s->Add(grid, 0, wxEXPAND);
+        m_frames = Secondary(new wxStaticText(p, wxID_ANY, wxEmptyString));
+        s->Add(m_frames, 0, wxTOP, FromDIP(6));
+        p->SetSizer(s);
+    }
+
+    // Drift and polar alignment
+    m_drift = AddSection("Drift & polar alignment");
+    {
+        wxWindow *p = m_drift.body;
+        auto grid = FieldGrid();
+        m_raDrift = AddField(p, grid, "RA drift");
+        m_decDrift = AddField(p, grid, "Dec drift");
+        m_paError = AddField(p, grid, "Polar alignment");
+        m_paError->SetToolTip("Polar alignment error, estimated from the Dec drift");
+        p->SetSizer(grid);
+    }
+
+    // Session details
+    m_details = AddSection("Session details");
+    {
+        wxWindow *p = m_details.body;
+        auto s = new wxBoxSizer(wxVERTICAL);
+        m_detailsGrid = FieldGrid();
+        s->Add(m_detailsGrid, 0, wxEXPAND);
+        m_rawHeader = new SectionHeader(p, "Raw header", true);
+        m_rawHeader->SetOpen(false);
+        m_headers.push_back(m_rawHeader);
+        m_raw = new wxTextCtrl(p, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, FromDIP(180)),
+                               wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP);
+        m_raw->SetFont(wxFont(wxFontInfo(GetFont().GetPointSize() - 1).Family(wxFONTFAMILY_TELETYPE)));
+        m_raw->Hide();
+        m_rawHeader->onToggle = [this](bool open) {
+            m_raw->Show(open);
+            Relayout();
+        };
+        s->Add(m_rawHeader, 0, wxTOP, FromDIP(6));
+        s->Add(m_raw, 0, wxEXPAND | wxTOP, FromDIP(4));
+        p->SetSizer(s);
+    }
+
+    // Display
+    m_display = AddSection("Display", false);
+    {
+        wxWindow *p = m_display.body;
+        auto grid = FieldGrid();
+        wxStaticText *label = Secondary(new wxStaticText(p, wxID_ANY, "Units"));
+        m_labels.push_back(label);
+        grid->Add(label, 0, wxALIGN_CENTER_VERTICAL);
+        m_units = new SegmentedControl(p, wxID_ANY, { "arc-sec", "pixels" }, "Units");
+        grid->Add(m_units);
+        m_units->Bind(wxEVT_CHOICE, [this](wxCommandEvent& event) {
+            if (onUnits)
+                onUnits(event.GetInt() == 0 ? Units::ArcSeconds : Units::Pixels);
+        });
+        p->SetSizer(grid);
+    }
+
+    // Exclusions
+    m_exclusions = AddSection("Exclusions", false);
+    {
+        wxWindow *p = m_exclusions.body;
+        auto s = new wxBoxSizer(wxVERTICAL);
+        m_excluded = Secondary(new wxStaticText(p, wxID_ANY, wxEmptyString));
+        s->Add(m_excluded, 0, wxBOTTOM, FromDIP(6));
+        m_byServer = new wxCheckBox(p, wxID_ANY, "Settling reported by PHD2");
+        m_byDistance = new wxCheckBox(p, wxID_ANY, "Settling by distance");
+        m_pauses = new wxCheckBox(p, wxID_ANY, "Paused by server");
+        m_byServer->SetToolTip("Exclude frames between PHD2's \"Settling started\" and \"Settling complete\" events");
+        m_byDistance->SetToolTip("Exclude frames after each dither until the star stays within the distance set in Preferences");
+        m_pauses->SetToolTip("Exclude frames between the server's PAUSE and RESUME commands");
+        for (wxCheckBox *cb : { m_byServer, m_byDistance, m_pauses })
+        {
+            s->Add(cb, 0, wxBOTTOM, FromDIP(4));
+            cb->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+                if (onExclusions)
+                    onExclusions(Rules());
+            });
+        }
+        auto buttons = new wxBoxSizer(wxHORIZONTAL);
+        m_includeAll = new wxButton(p, wxID_ANY, "Include All");
+        m_excludeAll = new wxButton(p, wxID_ANY, "Exclude All");
+        buttons->Add(m_includeAll, 0, wxRIGHT, FromDIP(6));
+        buttons->Add(m_excludeAll);
+        m_includeAll->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { if (onIncludeAll) onIncludeAll(true); });
+        m_excludeAll->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { if (onIncludeAll) onIncludeAll(false); });
+        s->Add(buttons, 0, wxTOP, FromDIP(4));
+        p->SetSizer(s);
+    }
+
+    AlignLabels();
+}
+
+Inspector::Section Inspector::AddSection(const wxString& title, bool open)
+{
+    Section section;
+    section.header = new SectionHeader(this, title);
+    section.header->SetOpen(open);
+    section.body = new wxPanel(this);
+    section.body->Show(open);
+    m_headers.push_back(section.header);
+
+    wxPanel *body = section.body;
+    section.header->onToggle = [this, body](bool isOpen) {
+        body->Show(isOpen);
+        Relayout();
+    };
+
+    int pad = FromDIP(12);
+    GetSizer()->Add(section.header, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(8));
+    GetSizer()->Add(section.body, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
+    return section;
+}
+
+wxStaticText *Inspector::AddField(wxWindow *parent, wxFlexGridSizer *grid, const wxString& label)
+{
+    wxStaticText *name = Secondary(new wxStaticText(parent, wxID_ANY, label));
+    m_labels.push_back(name);
+    grid->Add(name);
+    auto value = new wxStaticText(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+                                  wxST_ELLIPSIZE_END);
+    grid->Add(value, 1, wxEXPAND);
+    return value;
+}
+
+// Gives every field label the width of the widest, so values line up from
+// one section to the next.
+void Inspector::AlignLabels()
+{
+    int widest = 0;
+    for (wxStaticText *t : m_labels)
+        widest = std::max(widest, t->GetBestSize().x);
+    for (wxStaticText *t : m_labels)
+        t->SetMinSize(wxSize(widest, -1));
+}
+
+wxStaticText *Inspector::Secondary(wxStaticText *text)
+{
+    text->SetForegroundColour(m_palette.text2);
+    m_secondary.push_back(text);
+    return text;
+}
+
+void Inspector::SetPalette(const Palette& palette)
+{
+    m_palette = palette;
+    for (wxStaticText *t : m_secondary)
+        t->SetForegroundColour(palette.text2);
+    for (SectionHeader *h : m_headers)
+        h->SetPalette(palette);
+    m_units->SetPalette(palette);
+    Refresh();
+}
+
+void Inspector::Relayout()
+{
+    Layout();
+    FitInside();
+}
+
+ExclusionSettings Inspector::Rules() const
+{
+    ExclusionSettings x;
+    x.settlingByServer = m_byServer->GetValue();
+    x.settlingByDistance = m_byDistance->GetValue();
+    x.serverPauses = m_pauses->GetValue();
+    return x;
+}
+
+void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
+{
+    wxWindowUpdateLocker lock(this);
+
+    const GuideSession *session = doc.Session();
+    const LogSection *section = session;
+    if (!section)
+        section = doc.CalibrationSection();
+
+    m_empty->Show(!section);
+    for (Section *s : { &m_summary, &m_drift, &m_display, &m_exclusions })
+        s->Show(session != nullptr);
+    m_details.Show(section != nullptr);
+
+    if (session)
+    {
+        Units units = settings.display.units;
+        size_t frames = doc.Selection() ? doc.Selection()->last - doc.Selection()->first + 1 : session->entries.size();
+        SummaryText t = Summarize(doc.Stats(), frames, session->pixelScale, units);
+
+        m_summary.header->SetTitle(doc.Selection() ? "Selection" : "Summary");
+        m_total->SetLabel(U(t.total));
+        m_alt->SetLabel(U("total RMS · " + t.alt));
+        m_ra->SetLabel(U(t.ra));
+        m_dec->SetLabel(U(t.dec));
+        m_peak->SetLabel(U(t.peak));
+        m_elongation->SetLabel(U(t.elongation));
+        m_frames->SetLabel(U(t.frames));
+        m_raDrift->SetLabel(U(t.raDrift));
+        m_decDrift->SetLabel(U(t.decDrift));
+        m_paError->SetLabel(U(t.paError));
+
+        m_units->SetSelection(units == Units::ArcSeconds ? 0 : 1);
+
+        size_t excluded = 0;
+        for (const auto& e : session->entries)
+            if (!e.included)
+                excluded++;
+        m_excluded->SetLabel(excluded == 0 ? wxString("No frames excluded") :
+                             wxString::Format("%zu of %zu frames excluded", excluded, session->entries.size()));
+        m_byServer->SetValue(settings.exclusions.settlingByServer);
+        m_byDistance->SetValue(settings.exclusions.settlingByDistance);
+        m_pauses->SetValue(settings.exclusions.serverPauses);
+    }
+
+    if (section)
+    {
+        wxWindow *p = m_details.body;
+        for (wxSizerItem *item : m_detailsGrid->GetChildren())
+        {
+            wxWindow *w = item->GetWindow();
+            std::erase_if(m_secondary, [w](wxStaticText *t) { return t == w; });
+            std::erase_if(m_labels, [w](wxStaticText *t) { return t == w; });
+        }
+        m_detailsGrid->Clear(true);
+        for (const DetailField& f : SessionDetails(section->hdr))
+        {
+            wxStaticText *value = AddField(p, m_detailsGrid, U(f.label));
+            value->SetLabel(U(f.value));
+            value->SetToolTip(U(f.value));
+        }
+
+        wxString raw;
+        for (const wxString& line : section->hdr)
+            raw << line << "\n";
+        m_raw->ChangeValue(raw);
+        AlignLabels();
+    }
+
+    Relayout();
+}
