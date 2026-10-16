@@ -32,7 +32,7 @@
 // its section.
 class SectionHeaderAccessible : public wxAccessible
 {
-    SectionHeader *Header() const { return static_cast<SectionHeader *>(GetWindow()); }
+    SectionHeader *Header() { return static_cast<SectionHeader *>(GetWindow()); }
 
 public:
     explicit SectionHeaderAccessible(SectionHeader *header) : wxAccessible(header) { }
@@ -45,7 +45,7 @@ public:
 
     wxAccStatus GetRole(int, wxAccRole *role) override
     {
-        *role = wxROLE_SYSTEM_OUTLINEBUTTON;
+        *role = wxROLE_SYSTEM_PUSHBUTTON;
         return wxACC_OK;
     }
 

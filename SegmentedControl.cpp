@@ -32,8 +32,8 @@
 // Lets screen readers see each segment as a radio button.
 class SegmentedAccessible : public wxAccessible
 {
-    SegmentedControl *Control() const { return static_cast<SegmentedControl *>(GetWindow()); }
-    bool Valid(int child) const { return child >= 1 && child <= (int) Control()->m_labels.size(); }
+    SegmentedControl *Control() { return static_cast<SegmentedControl *>(GetWindow()); }
+    bool Valid(int child) { return child >= 1 && child <= (int) Control()->m_labels.size(); }
 
 public:
     explicit SegmentedAccessible(SegmentedControl *control) : wxAccessible(control) { }
