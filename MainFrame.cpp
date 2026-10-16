@@ -92,7 +92,8 @@ const char *HELP_HTML =
     "<h3>The window</h3>"
     "<ul>"
     "<li>The <b>sidebar</b> lists the log's calibrations and guiding sessions with their start, length and total RMS. "
-    "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between them.</li>"
+    "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between them. CMD-click or "
+    "SHIFT-click several guiding sessions to see them as one, at their clock times, with statistics for them all.</li>"
     "<li>The <b>toolbar</b> switches the chart between Timeline, Scatter, Drift and Frequency (CMD+1 to CMD+4).</li>"
     "<li>The <b>inspector</b> shows the statistics, drift and polar alignment, the session's equipment and "
     "settings (with the raw header), display options, analysis options and exclusion rules.</li>"
@@ -105,6 +106,8 @@ const char *HELP_HTML =
     "and OPT-drag to move it. The strip under the chart shows the whole session: drag its highlight or click to jump.</li>"
     "<li>Point at the chart to read a frame in the status line: its time, offsets, guide pulses, SNR and star mass.</li>"
     "<li>Guide pulses are bars from the zero line: up for West and North pulses, down for East and South.</li>"
+    "<li><b>Running RMS</b>, in the Display options, draws the total RMS over the last 1 to 10 minutes at each "
+    "frame, to show guiding getting better or worse through the night.</li>"
     "<li><b>Drag</b> to select frames. The inspector then shows the selection's statistics, and Drift, Frequency "
     "and Scatter analyse just those frames. Esc deselects.</li>"
     "<li>CMD-drag excludes frames from the statistics and SHIFT-drag includes them. CMD-click an excluded "
@@ -420,7 +423,7 @@ void MainFrame::BuildLayout()
     m_outer->Initialize(m_inner);
     m_inner->Initialize(m_chart);
 
-    m_sidebar->onSelect = [this](size_t section) { SelectSection(section); };
+    m_sidebar->onSelect = [this](const std::vector<size_t>& sections) { SelectSections(sections); };
     m_inspector->onDisplay = [this](const DisplayOptions& options) { SetDisplay(options); };
     m_inspector->onLockVertical = [this](bool lock) { LockVertical(lock); };
     m_inspector->onAnalysis = [this](const AnalysisOptions& options) {
@@ -635,10 +638,25 @@ void MainFrame::OnAbout(wxCommandEvent&)
 
 void MainFrame::SelectSection(size_t section)
 {
-    m_doc.Select(section);
+    SelectSections({ section });
+}
+
+void MainFrame::SelectSections(const std::vector<size_t>& sections)
+{
+    if (sections.size() == 1)
+        m_doc.Select(sections.front());
+    else
+        m_doc.SelectSections(sections);
     ChooseDevice();
     m_chart->Timeline()->ClearHover();
     UpdateAll();
+}
+
+wxString MainFrame::Heading() const
+{
+    if (m_doc.Combined())
+        return U(CombinedTitle(m_doc.Log(), m_doc.Sections()));
+    return m_doc.Current() ? U(SectionTitle(m_doc.Log(), *m_doc.Current())) : wxString();
 }
 
 // Shows the pulses of the device a session guided with. Only a session
@@ -751,7 +769,7 @@ void MainFrame::UpdateSubtitle()
     XAxis axis = m_doc.GetXAxis();
     double t0 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.First(), axis), XAxis::Time);
     double t1 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.Last(), axis), XAxis::Time);
-    m_chart->SetHeading(U(SectionTitle(m_doc.Log(), *m_doc.Current())), U(VisibleRange(*s, t0, t1)));
+    m_chart->SetHeading(Heading(), U(VisibleRange(*s, t0, t1)));
 }
 
 void MainFrame::SetView(ChartKind view)
@@ -863,7 +881,7 @@ void MainFrame::ShowInspector(bool show)
 void MainFrame::UpdateAll()
 {
     m_analysisStale = true;
-    m_sidebar->SetLog(m_doc.Log(), m_doc.Current(), m_settings.display.units);
+    m_sidebar->SetLog(m_doc.Log(), m_doc.Sections(), m_settings.display.units);
     m_inspector->ShowDocument(m_doc, m_settings);
     UpdateTitle();
     UpdateChart();
@@ -900,11 +918,10 @@ void MainFrame::UpdateChart()
         return;
     }
 
-    size_t section = *m_doc.Current();
-    m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), wxEmptyString);
+    m_chart->SetHeading(Heading(), wxEmptyString);
     if (m_doc.CalibrationSection())
     {
-        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), "Camera pixels from the start");
+        m_chart->SetHeading(Heading(), "Camera pixels from the start");
         m_chart->SetLegend("West", "North");
         m_chart->SetDefaultStatus(wxString::FromUTF8(
 #ifdef __WXOSX__
@@ -923,7 +940,7 @@ void MainFrame::UpdateChart()
     {
         const GuideSession *s = m_doc.Session();
         size_t frames = m_doc.Selection() ? m_doc.Selection()->last - m_doc.Selection()->first + 1 : s->entries.size();
-        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)),
+        m_chart->SetHeading(Heading(),
                             wxString::FromUTF8(std::string(radec ? "RA against Dec" : "dx against dy") +
                                                (m_doc.Selection() ? " \u00b7 selected frames" : " \u00b7 whole session")));
         m_chart->SetLegend(wxEmptyString, wxEmptyString);
@@ -942,7 +959,7 @@ void MainFrame::UpdateChart()
             a.drift == DriftModel::Line ? wxString("Straight-line drift removed") : wxString("Curved drift removed");
         if (a.rawRa)
             what += ", RA pulses added back";
-        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), what + wxString::FromUTF8(" \u00b7 ") + AnalysisScope());
+        m_chart->SetHeading(Heading(), what + wxString::FromUTF8(" \u00b7 ") + AnalysisScope());
         if (!drift)
             m_chart->SetLegend(wxEmptyString, wxEmptyString);
         if (!Analysis())

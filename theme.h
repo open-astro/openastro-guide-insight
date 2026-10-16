@@ -39,6 +39,7 @@ struct Palette
     wxColour text2;   // secondary text
     wxColour border;
     wxColour ra, dec;
+    wxColour rms;             // the running RMS
     wxColour raFill, decFill; // correction bars
     wxColour excluded;        // shading over excluded frames
     wxColour accent;
