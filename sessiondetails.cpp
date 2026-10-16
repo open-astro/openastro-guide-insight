@@ -194,11 +194,12 @@ std::vector<DetailField> SessionDetails(const wxArrayString& hdr)
 
 namespace {
 
+// A number with a decimal point, whatever the locale. (std::from_chars for
+// doubles is missing from the C++ library of the macOS build machines.)
 std::optional<double> Number(const std::string& text)
 {
     double v;
-    auto res = std::from_chars(text.data(), text.data() + text.size(), v);
-    if (res.ec != std::errc())
+    if (!wxString::FromUTF8(text).ToCDouble(&v))
         return std::nullopt;
     return v;
 }
@@ -227,7 +228,7 @@ std::vector<DetailField> CalibrationDetails(const Calibration& cal)
     {
         std::string line(wxln.utf8_str());
         if (StartsWith(line, "Pixel scale = "))
-            pixelScale = Number(FirstItem(line.substr(14)));
+            pixelScale = Number(StripSuffix(FirstItem(line.substr(14)), " arc-sec/px"));
         else if (StartsWith(line, "West calibration complete."))
             ra = AxisFrom(line);
         else if (StartsWith(line, "North calibration complete."))
