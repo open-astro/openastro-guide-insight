@@ -32,6 +32,8 @@
 
 class SegmentedControl : public wxControl
 {
+    friend class SegmentedAccessible;
+
     std::vector<wxString> m_labels;
     std::vector<int> m_edges; // x where each segment starts, plus the end
     int m_selection = 0;

@@ -26,6 +26,94 @@
 #include <algorithm>
 #include <memory>
 
+#if wxUSE_ACCESSIBILITY
+#include <wx/access.h>
+
+// Lets screen readers see each segment as a radio button.
+class SegmentedAccessible : public wxAccessible
+{
+    SegmentedControl *Control() { return static_cast<SegmentedControl *>(GetWindow()); }
+    bool Valid(int child) { return child >= 1 && child <= (int) Control()->m_labels.size(); }
+
+public:
+    explicit SegmentedAccessible(SegmentedControl *control) : wxAccessible(control) { }
+
+    wxAccStatus GetChildCount(int *count) override
+    {
+        *count = (int) Control()->m_labels.size();
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetChild(int child, wxAccessible **object) override
+    {
+        *object = child == wxACC_SELF ? this : nullptr;
+        return child == wxACC_SELF || Valid(child) ? wxACC_OK : wxACC_FAIL;
+    }
+
+    wxAccStatus GetName(int child, wxString *name) override
+    {
+        if (child == wxACC_SELF)
+            *name = Control()->GetName();
+        else if (Valid(child))
+            *name = Control()->m_labels[child - 1];
+        else
+            return wxACC_FAIL;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetRole(int child, wxAccRole *role) override
+    {
+        *role = child == wxACC_SELF ? wxROLE_SYSTEM_GROUPING : wxROLE_SYSTEM_RADIOBUTTON;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetState(int child, long *state) override
+    {
+        *state = wxACC_STATE_SYSTEM_FOCUSABLE;
+        if (Valid(child) && child - 1 == Control()->m_selection)
+            *state |= wxACC_STATE_SYSTEM_CHECKED;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetDefaultAction(int child, wxString *action) override
+    {
+        if (!Valid(child))
+            return wxACC_NOT_SUPPORTED;
+        *action = "Select";
+        return wxACC_OK;
+    }
+
+    wxAccStatus DoDefaultAction(int child) override
+    {
+        if (!Valid(child))
+            return wxACC_NOT_SUPPORTED;
+        Control()->Choose(child - 1);
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetLocation(wxRect& rect, int child) override
+    {
+        SegmentedControl *c = Control();
+        rect = c->GetScreenRect();
+        if (Valid(child))
+        {
+            rect.x += c->m_edges[child - 1];
+            rect.width = c->m_edges[child] - c->m_edges[child - 1];
+        }
+        return wxACC_OK;
+    }
+
+    wxAccStatus HitTest(const wxPoint& pt, int *child, wxAccessible **object) override
+    {
+        SegmentedControl *c = Control();
+        wxPoint p = c->ScreenToClient(pt);
+        *object = nullptr;
+        *child = c->GetClientRect().Contains(p) ? c->SegmentAt(p.x) + 1 : wxACC_SELF;
+        return wxACC_OK;
+    }
+};
+#endif
+
 static const int PAD_X = 12;
 static const int HEIGHT_PAD = 9;
 
@@ -40,6 +128,9 @@ SegmentedControl::SegmentedControl(wxWindow *parent, wxWindowID id, const std::v
     Create(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxWANTS_CHARS, wxDefaultValidator, name);
     Measure();
     SetInitialSize(DoGetBestSize());
+#if wxUSE_ACCESSIBILITY
+    SetAccessible(new SegmentedAccessible(this));
+#endif
 
     Bind(wxEVT_PAINT, &SegmentedControl::OnPaint, this);
     Bind(wxEVT_LEFT_DOWN, &SegmentedControl::OnLeftDown, this);
