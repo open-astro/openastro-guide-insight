@@ -102,7 +102,7 @@ configure_file(version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
 # for packaging scripts that name files by version
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/version.txt "${PROJECT_VERSION}\n")
 if(WIN32)
-  configure_file(openastro-guide-insight-x64.iss.in ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.iss @ONLY)
+  configure_file(openastro-guide-insight.iss.in ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.iss @ONLY)
 endif()
 
 # Parser and analysis code, independent of the GUI so it can be unit tested.
