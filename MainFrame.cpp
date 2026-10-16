@@ -113,6 +113,9 @@ const char *HELP_HTML =
     "<li><b>To improve</b> lists what the log points to, most important first, with the settings to try. "
     "<b>Show on the timeline</b> selects the frames a finding is about.</li>"
     "<li><b>Going well</b> lists what needs no change.</li>"
+    "<li><b>Compared with earlier nights</b> looks at the other PHD2 guide logs in the same folder. It shows how the "
+    "total RMS changed since the latest night with the same equipment profile, which settings changed, and the "
+    "last few nights' trend.</li>"
     "</ul>"
     "<p>Suggestions are starting points. Change one setting at a time and compare the next night.</p>"
 
@@ -517,6 +520,16 @@ void MainFrame::Open(const wxString& path)
     m_path = path;
     m_history.AddFileToHistory(path);
     m_settings.openDir = fn.GetPath();
+
+    // tonight against earlier nights' logs in the same folder
+    std::optional<NightComparison> comparison;
+    {
+        wxBusyCursor busy;
+        std::string utf8(path.utf8_str());
+        if (std::optional<NightSummary> tonight = m_nights.Summary(utf8))
+            comparison = CompareNights(*tonight, m_nights.Summaries(GuideLogsBeside(utf8)));
+    }
+    m_inspector->SetComparison(comparison);
 
     // start on the first guiding session, the usual reason to open a log
     const GuideLog& log = m_doc.Log();
