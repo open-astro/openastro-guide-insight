@@ -201,6 +201,17 @@ jobs:
             package=openastro-guide-insight-$version-macos-arm64.dmg
             scripts/make-dmg.sh "stage/OpenAstro Guide Insight.app" "$package"
             scripts/check-dmg.sh "$package"
+          elif [[ "$RUNNER_OS" == Windows ]]; then
+            # an Inno Setup 6 installer for this architecture
+            arch=${{ matrix.preset == 'win-arm64' && 'arm64' || 'x64' }}
+            iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+            if [[ ! -x $iscc ]]; then
+              choco install innosetup --no-progress -y >/dev/null
+            fi
+            "$iscc" //Q "//DArch=$arch" "//DSourceDir=$(cygpath -w "$PWD/stage")" \
+              "//O$(cygpath -w "$PWD")" "$(cygpath -w out/build/${{ matrix.preset }}/openastro-guide-insight.iss)"
+            package=openastro-guide-insight-$version-windows-$arch-setup.exe
+            scripts/check-installer.sh "$package"
           else
             package=${{ matrix.artifact }}.tar.gz
             tar -C stage -czf "$package" .

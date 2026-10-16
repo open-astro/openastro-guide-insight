@@ -1,0 +1,65 @@
+; Inno Setup 6 script for OpenAstro Guide Insight, one per architecture.
+; CMake fills in the version; pass the architecture and the folder holding
+; the installed files:
+;   ISCC /DArch=x64 /DSourceDir=C:\path\to\stage openastro-guide-insight.iss
+;   ISCC /DArch=arm64 /DSourceDir=C:\path\to\stage openastro-guide-insight.iss
+
+#define MyAppName "OpenAstro Guide Insight"
+#define MyAppVersion "@PROJECT_VERSION@"
+#define MyAppPublisher "OpenAstro"
+#define MyAppURL "https://github.com/open-astro/openastro-guide-insight"
+#define MyAppExeName "OpenAstroGuideInsight.exe"
+
+#ifndef Arch
+  #error Pass /DArch=x64 or /DArch=arm64
+#endif
+#ifndef SourceDir
+  #error Pass /DSourceDir=<folder with the installed files>
+#endif
+
+[Setup]
+; The AppId identifies this app to Windows; keep it the same across versions.
+AppId={{50971988-2E0B-45A2-8494-94275F02E1D9}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
+DefaultDirName={autopf}\{#MyAppName}
+DefaultGroupName={#MyAppName}
+DisableProgramGroupPage=yes
+LicenseFile={#SourceDir}\LICENSE.txt
+OutputDir=.
+OutputBaseFilename=openastro-guide-insight-{#MyAppVersion}-windows-{#Arch}-setup
+UninstallDisplayIcon={app}\{#MyAppExeName}
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern
+MinVersion=10.0
+PrivilegesRequiredOverridesAllowed=commandline dialog
+#if Arch == "arm64"
+ArchitecturesAllowed=arm64
+ArchitecturesInstallIn64BitMode=arm64
+#else
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+#endif
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[Files]
+Source: "{#SourceDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
