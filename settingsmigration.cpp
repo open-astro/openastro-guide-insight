@@ -19,6 +19,8 @@
 
 #include "settingsmigration.h"
 
+#include <wx/arrstr.h>
+
 static bool IsEmpty(wxConfigBase& c)
 {
     return c.GetNumberOfEntries(true) == 0 && c.GetNumberOfGroups(true) == 0;
