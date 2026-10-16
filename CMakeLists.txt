@@ -143,6 +143,8 @@ add_library(guideinsight_core STATIC
   labels.h
   appsettings.cpp
   appsettings.h
+  timeline.cpp
+  timeline.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
