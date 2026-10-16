@@ -30,6 +30,8 @@
 #include <vector>
 
 class CalibrationCanvas;
+class DriftCanvas;
+class FrequencyCanvas;
 class OverviewScrubber;
 class ScatterCanvas;
 class TimelineCanvas;
@@ -47,7 +49,11 @@ class ChartView : public wxPanel
     TimelineCanvas *m_timeline;
     ScatterCanvas *m_scatter;
     CalibrationCanvas *m_calibration;
+    DriftCanvas *m_drift;
+    FrequencyCanvas *m_frequency;
     OverviewScrubber *m_overview;
+
+    void ShowPage(int page, bool overview);
     wxStaticText *m_status;
     wxString m_messageText, m_hint;
     wxString m_defaultStatus;
@@ -69,6 +75,8 @@ public:
     void ShowTimeline();
     void ShowScatter();
     void ShowCalibration();
+    void ShowDrift();
+    void ShowFrequency();
 
     void RefreshChart();
     void ApplyPalette();

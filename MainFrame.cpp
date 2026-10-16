@@ -25,6 +25,7 @@
 #include "SegmentedControl.h"
 #include "SessionSidebar.h"
 #include "TimelineCanvas.h"
+#include "periodogram.h"
 #include "icons.h"
 #include "labels.h"
 #include "timeline.h"
@@ -34,6 +35,7 @@
 #include <wx/clipbrd.h>
 #include <wx/config.h>
 #include <wx/display.h>
+#include <wx/file.h>
 #include <wx/dnd.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
@@ -75,6 +77,8 @@ enum
     ID_ZOOM_SELECTION,
     ID_FIT_VERTICAL,
     ID_LOCK_VERTICAL,
+    ID_EXPORT_CSV,
+    ID_SELECT_GA,
 };
 
 const wxString VIEW_NAMES[] = { "Timeline", "Scatter", "Drift", "Frequency" };
@@ -173,6 +177,7 @@ void MainFrame::BuildMenus()
     file->AppendSubMenu(recent, "Open &Recent");
     file->AppendSeparator();
     file->Append(ID_OPEN_IN_EDITOR, "Open in &Text Editor", "Open the log file in your text editor");
+    file->Append(ID_EXPORT_CSV, "&Export Periodogram as CSV...", "Save the Frequency chart's periods and amplitudes");
     file->AppendSeparator();
     file->Append(wxID_CLOSE, "&Close Window\tCtrl+W");
 #ifndef __WXOSX__
@@ -184,6 +189,8 @@ void MainFrame::BuildMenus()
     edit->AppendSeparator();
     edit->Append(wxID_SELECTALL, "Select &All Frames\tCtrl+A");
     edit->Append(ID_DESELECT, "&Deselect\tCtrl+Shift+A");
+    edit->Append(ID_SELECT_GA, "Select &Guiding Assistant Run",
+                 "Select the frames of a Guiding Assistant run, with guide output off, to analyse them");
     edit->AppendSeparator();
     edit->Append(ID_EXCLUDE_SELECTION, "E&xclude Selected Frames\tCtrl+Back");
     edit->Append(ID_INCLUDE_SELECTION, "I&nclude Selected Frames\tCtrl+Shift+Back");
@@ -253,6 +260,14 @@ void MainFrame::BuildMenus()
     Bind(wxEVT_MENU, [this](wxCommandEvent& e) { SetView((ChartKind) (e.GetId() - ID_VIEW_TIMELINE)); },
          ID_VIEW_TIMELINE, ID_VIEW_FREQUENCY);
     Bind(wxEVT_MENU, &MainFrame::OnSelectAll, this, wxID_SELECTALL);
+    Bind(wxEVT_MENU, &MainFrame::OnExportCsv, this, ID_EXPORT_CSV);
+    Bind(wxEVT_MENU, &MainFrame::OnSelectGuidingAssistant, this, ID_SELECT_GA);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        e.Enable(m_settings.view == ChartKind::Frequency && Analysis() != nullptr);
+    }, ID_EXPORT_CSV);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        e.Enable(m_doc.Session() && !GuidingAssistantRuns(*m_doc.Session()).empty());
+    }, ID_SELECT_GA);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
         m_doc.SetSelection(std::nullopt);
         SelectionChanged();
@@ -348,6 +363,14 @@ void MainFrame::BuildLayout()
     m_sidebar->onSelect = [this](size_t section) { SelectSection(section); };
     m_inspector->onDisplay = [this](const DisplayOptions& options) { SetDisplay(options); };
     m_inspector->onLockVertical = [this](bool lock) { LockVertical(lock); };
+    m_inspector->onAnalysis = [this](const AnalysisOptions& options) {
+        m_settings.analysis = options;
+        UpdateAll();
+    };
+    m_inspector->onSelectGuidingAssistant = [this] {
+        wxCommandEvent dummy;
+        OnSelectGuidingAssistant(dummy);
+    };
     m_inspector->onExclusions = [this](const ExclusionSettings& rules) {
         ExclusionSettings x = rules;
         x.settle = m_settings.exclusions.settle;
@@ -636,7 +659,7 @@ void MainFrame::FramesChanged()
 void MainFrame::SelectionChanged()
 {
     m_inspector->ShowDocument(m_doc, m_settings);
-    if (m_settings.view == ChartKind::Scatter)
+    if (m_settings.view != ChartKind::Timeline)
         UpdateChart();
     m_chart->RefreshChart();
 }
@@ -669,7 +692,77 @@ void MainFrame::SetView(ChartKind view)
 {
     m_settings.view = view;
     m_views->SetSelection((int) view);
+    m_inspector->ShowDocument(m_doc, m_settings);
     UpdateChart();
+}
+
+const GARun *MainFrame::Analysis()
+{
+    const GuideSession *s = m_doc.Session();
+    if (!s || s->entries.empty())
+        return nullptr;
+
+    AnalysisKey key;
+    key.session = s;
+    key.range = m_doc.Selection() ? *m_doc.Selection() : IndexRun{ 0, (unsigned int) s->entries.size() - 1 };
+    key.options = m_settings.analysis;
+    if (m_analysisStale || !(key == m_analysisKey))
+    {
+        m_analysisStale = false;
+        m_analysisKey = key;
+        m_analysisGeneration++;
+        m_analysis.reset();
+        size_t begin = key.range.first, end = key.range.last + 1;
+        if (GARun::CanAnalyze(*s, begin, end))
+        {
+            m_analysis = std::make_unique<GARun>();
+            m_analysis->Analyze(*s, begin, end, key.options.rawRa, key.options.driftCorrection);
+        }
+    }
+    return m_analysis.get();
+}
+
+wxString MainFrame::AnalysisScope() const
+{
+    const auto& sel = m_doc.Selection();
+    return sel ? wxString::Format("frames %u to %u", sel->first + 1, sel->last + 1) : wxString("whole session");
+}
+
+void MainFrame::OnExportCsv(wxCommandEvent&)
+{
+    const GARun *ga = Analysis();
+    if (!ga || ga->nfft == 0)
+        return;
+    wxFileDialog dlg(this, "Export Periodogram as CSV", m_settings.openDir,
+                     wxString::Format("periodogram_%s.csv", ga->starts.Format("%Y%m%d_%H%M%S")),
+                     "CSV files (*.csv)|*.csv", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    if (dlg.ShowModal() != wxID_OK)
+        return;
+    wxFile f;
+    if (!f.Create(dlg.GetPath(), true) || !f.Write(wxString::FromUTF8(FftCsv(*ga))))
+        wxLogError("Cannot write the file \"%s\".", dlg.GetPath());
+}
+
+// Selects a Guiding Assistant run: the first, or the next after the one
+// already selected.
+void MainFrame::OnSelectGuidingAssistant(wxCommandEvent&)
+{
+    const GuideSession *s = m_doc.Session();
+    if (!s)
+        return;
+    std::vector<IndexRun> runs = GuidingAssistantRuns(*s);
+    if (runs.empty())
+        return;
+    IndexRun next = runs.front();
+    if (const auto& sel = m_doc.Selection())
+        for (const IndexRun& r : runs)
+            if (r.first > sel->first)
+            {
+                next = r;
+                break;
+            }
+    m_doc.SetSelection(next);
+    SelectionChanged();
 }
 
 void MainFrame::ShowSidebar(bool show)
@@ -703,6 +796,7 @@ void MainFrame::ShowInspector(bool show)
 
 void MainFrame::UpdateAll()
 {
+    m_analysisStale = true;
     m_sidebar->SetLog(m_doc.Log(), m_doc.Current(), m_settings.display.units);
     m_inspector->ShowDocument(m_doc, m_settings);
     UpdateTitle();
@@ -773,10 +867,36 @@ void MainFrame::UpdateChart()
         m_chart->ShowScatter();
         return;
     }
-    if (m_settings.view != ChartKind::Timeline)
+    if (m_settings.view == ChartKind::Drift || m_settings.view == ChartKind::Frequency)
     {
-        m_chart->SetDefaultStatus(wxEmptyString);
-        m_chart->ShowMessage(VIEW_NAMES[(int) m_settings.view]);
+        bool drift = m_settings.view == ChartKind::Drift;
+        const AnalysisOptions& a = m_settings.analysis;
+        wxString what = drift ? (a.driftCorrection ? "Drift removed" : "Drift not removed") : "RA periodogram";
+        if (a.rawRa)
+            what += ", RA pulses added back";
+        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), what + wxString::FromUTF8(" \u00b7 ") + AnalysisScope());
+        if (!drift)
+            m_chart->SetLegend(wxEmptyString, wxEmptyString);
+        if (!Analysis())
+        {
+            m_chart->SetDefaultStatus(wxEmptyString);
+            m_chart->ShowMessage("Too few frames to analyse",
+                                 "Drift and Frequency need at least 12 frames that count toward the statistics");
+            return;
+        }
+        m_chart->SetDefaultStatus(wxString::FromUTF8(drift ?
+#ifdef __WXOSX__
+            "Drag or scroll to pan · pinch or ⌘-scroll to zoom · select frames in the Timeline to analyse them"
+            : "Point at the curve to read a peak · File › Export Periodogram as CSV saves it"
+#else
+            "Drag or scroll to pan · Ctrl-scroll to zoom · select frames in the Timeline to analyse them"
+            : "Point at the curve to read a peak · File › Export Periodogram as CSV saves it"
+#endif
+            ));
+        if (drift)
+            m_chart->ShowDrift();
+        else
+            m_chart->ShowFrequency();
         return;
     }
 

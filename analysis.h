@@ -27,6 +27,9 @@
 
 #include <stddef.h>
 #include <string>
+#include <vector>
+
+#include "graphmath.h"
 
 struct GuideSession;
 
@@ -83,6 +86,10 @@ GuideStats CalcStats(const GuideSession& session, size_t begin, size_t end);
 // The periodogram as CSV text: a header row, then period (s), amplitude (px)
 // and amplitude (arc-seconds) per row.
 std::string FftCsv(const GARun& ga);
+
+// The stretches of a session with guide output off, such as a Guiding
+// Assistant run, that have enough frames to analyse.
+std::vector<IndexRun> GuidingAssistantRuns(const GuideSession& session);
 
 // What kind of run a guiding section was, for the log's table of contents:
 // "Guiding", "Guiding Assistant", "Guiding + GA", "Unguided" or
