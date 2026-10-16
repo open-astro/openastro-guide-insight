@@ -361,3 +361,112 @@ TEST_CASE("Fitting while locked changes the locked scale", "[document]")
     doc.FitVertical(300.);
     CHECK(doc.VerticalLock() == Approx(17.5));
 }
+
+namespace {
+
+// A log with sessions at 07:00 and 07:30, the second at a different pixel
+// scale, so combining them must line up their times and units.
+Document TwoSessions()
+{
+    std::string second = OneSession(5, 4., 2.);
+    second.replace(second.find("07:00:00"), 8, "07:30:00");
+    return Load(OneSession(10, 2., 1.) + second);
+}
+
+} // namespace
+
+TEST_CASE("Choosing several sessions combines them", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    CHECK(doc.Combined());
+    const GuideSession *s = doc.Session();
+    REQUIRE(s);
+    REQUIRE(s->entries.size() == 15);
+    // the second session's frames follow at their clock times
+    CHECK(s->entries[10].dt == Approx(1800. + 2.));
+    CHECK(s->entries.back().dt == Approx(1800. + 10.));
+    // and in the first session's pixels: 2 px at 4"/px is 4 px at 2"/px
+    CHECK(s->pixelScale == 2.);
+    CHECK(s->entries[10].raraw == Approx(4.));
+    CHECK(s->entries[0].raraw == Approx(1.));
+    CHECK(doc.Sections() == std::vector<size_t>{ 0, 1 });
+}
+
+TEST_CASE("Combined statistics cover every chosen session", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    CHECK(doc.Stats().frames == 15);
+}
+
+TEST_CASE("Excluding frames in combined sessions excludes them in the sessions", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    doc.IncludeFrames(IndexRun{ 8, 11 }, false);
+    CHECK(Excluded(doc.Log().sessions[0]) == 2);
+    CHECK(Excluded(doc.Log().sessions[1]) == 2);
+    CHECK(Excluded(*doc.Session()) == 4);
+    doc.IncludeAll(true);
+    CHECK(Excluded(doc.Log().sessions[0]) == 0);
+    CHECK(Excluded(doc.Log().sessions[1]) == 0);
+}
+
+TEST_CASE("Changing the exclusion rules rebuilds combined sessions", "[document]")
+{
+    Document doc = RealLog();
+    doc.SelectSections({ 1, 2 });
+    size_t before = Excluded(*doc.Session());
+    ExclusionSettings none;
+    none.settlingByServer = false;
+    doc.SetExclusions(none);
+    CHECK(before > 0);
+    CHECK(Excluded(*doc.Session()) == 0);
+}
+
+TEST_CASE("Combining leaves out calibrations, and needs two sessions", "[document]")
+{
+    Document doc = RealLog();
+    doc.SelectSections({ 0, 1 }); // a calibration and one session
+    CHECK_FALSE(doc.Combined());
+    CHECK(*doc.Current() == 1);
+    CHECK(doc.Session() == &doc.Log().sessions[0]);
+
+    doc.SelectSections({ 0, 1, 2 });
+    CHECK(doc.Combined());
+    CHECK(doc.Sections() == std::vector<size_t>{ 1, 2 });
+}
+
+TEST_CASE("Choosing one section ends the combination", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    doc.SetSelection(IndexRun{ 1, 2 });
+    doc.Select(1);
+    CHECK_FALSE(doc.Combined());
+    CHECK_FALSE(doc.Selection());
+    CHECK(doc.Session() == &doc.Log().sessions[1]);
+}
+
+TEST_CASE("Combined sessions have their own view", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    REQUIRE(doc.View());
+    doc.View()->horizontal.SetWidth(500.);
+    CHECK(doc.View()->horizontal.First() == Approx(0.));
+    CHECK(doc.View()->horizontal.Last() == Approx(14.));
+}
+
+TEST_CASE("Each session in a combination starts with a marker", "[document]")
+{
+    Document doc = TwoSessions();
+    doc.SelectSections({ 0, 1 });
+    const auto& infos = doc.Session()->infos;
+    REQUIRE(infos.size() >= 2);
+    CHECK(infos[0].idx == 0);
+    CHECK(infos[0].info == "Session 07:00:00");
+    CHECK(infos.back().idx == 10);
+    CHECK(infos.back().info == "Session 07:30:00");
+}

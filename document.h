@@ -71,7 +71,18 @@ class Document
     double m_lock = 0.; // locked vertical scale, screen pixels per arc-second
     std::vector<SessionView> m_views; // one per session
 
+    // Several sessions shown as one: their indices into m_log.sections, the
+    // combined session, and where each of its frames came from.
+    std::vector<size_t> m_combinedSections;
+    GuideSession m_combined{ wxString() };
+    std::vector<std::pair<size_t, size_t>> m_sources; // (session, entry)
+    SessionView m_combinedView;
+
     void ResetViews();
+    void BuildCombined();
+    // Includes or excludes frames of the current session, or of the
+    // sessions behind a combination.
+    void SetIncluded(const IndexRun& run, bool include);
 
 public:
     // Reads a log, applies the exclusion settings to every session and works
@@ -92,6 +103,13 @@ public:
     std::optional<size_t> Current() const { return m_current; }
     // Makes a section current and clears the selection.
     void Select(size_t section);
+    // Shows several guiding sessions as one, frame after frame at their
+    // clock times and in the first session's pixel scale. Calibrations are
+    // left out; with fewer than two sessions this is Select.
+    void SelectSections(const std::vector<size_t>& sections);
+    bool Combined() const { return !m_combinedSections.empty(); }
+    // The sections being shown: several when combined, else the current one.
+    std::vector<size_t> Sections() const;
 
     // The current section if it is a guiding session or a calibration.
     GuideSession *Session();
