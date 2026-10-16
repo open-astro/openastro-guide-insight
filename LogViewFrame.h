@@ -21,6 +21,7 @@
 #define __LogViewFrame__
 
 #include "LogViewFrameBase.h"
+#include "exclusion.h"
 
 #include <wx/timer.h>
 
@@ -111,8 +112,9 @@ class SettingsDialog : public SettingsDialogBase
 public:
     wxColour m_raColor;
     wxColour m_decColor;
+    wxCheckBox *m_excludePauses;
 
-    SettingsDialog(wxWindow *parent) : SettingsDialogBase(parent) { }
+    SettingsDialog(wxWindow *parent);
     void OnRAColor(wxCommandEvent& event);
     void OnDecColor(wxCommandEvent& event);
 };
@@ -138,16 +140,12 @@ struct PointArray
 };
 extern PointArray s_tmp;
 
-struct SettleParams
-{
-    double pixels;
-    double seconds;
-};
 
 struct Settings
 {
     bool excludeByServer;
     bool excludeParametric;
+    bool excludeServerPauses;
     SettleParams settle;
     wxColor raColor;
     wxColor decColor;

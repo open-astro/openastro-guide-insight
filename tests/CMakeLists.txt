@@ -16,6 +16,7 @@ add_executable(phdlogview_tests
   test_analysis.cpp
   test_build.cpp
   test_graphmath.cpp
+  test_exclusion.cpp
 )
 target_link_libraries(phdlogview_tests PRIVATE phdlogview_core Catch2::Catch2)
 phdlogview_warnings(phdlogview_tests)

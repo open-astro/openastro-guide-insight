@@ -129,6 +129,8 @@ add_library(phdlogview_core STATIC
   analysis.h
   graphmath.cpp
   graphmath.h
+  exclusion.cpp
+  exclusion.h
 )
 target_include_directories(phdlogview_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(phdlogview_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)
