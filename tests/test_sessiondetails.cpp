@@ -220,3 +220,33 @@ TEST_CASE("A calibration that did not finish shows only its steps", "[sessiondet
     cal.entries = { west, west, backlash };
     CHECK(CalFields(cal) == std::vector<std::string>{ "Steps: W 2 \u00b7 B 1" });
 }
+
+TEST_CASE("The imaging gear an OpenAstro guider logs is shown after the guiding", "[sessiondetails]")
+{
+    auto hdr = Header({
+        "Equipment Profile = RedCat 51",
+        "Imaging telescope = RedCat 51, Focal length = 250 mm, Aperture = 51 mm, Focal ratio = f/4.9",
+        "Imaging camera = ZWO ASI2600MM Pro, Sensor = IMX571, Pixel size = 3.76 x 3.76 um, Binning = 1x1, Pixel scale = 3.10 arc-sec/px",
+        "Filter wheel = ZWO EFW 7x36, Filter = Ha, Position = 3 of 7, Focus offset = 0",
+        "RA = 21.00 hr, Dec = 44.5 deg, Hour angle = 2.98 hr, Pier side = East",
+    });
+    CHECK(Fields(hdr) == std::vector<std::string>{
+        "Profile: RedCat 51",
+        "Pointing: Dec 44.5° · pier East",
+        "Telescope: RedCat 51 · 250 mm",
+        "Imaging camera: ZWO ASI2600MM Pro · 3.10″/px",
+        "Filter: Ha",
+    });
+}
+
+TEST_CASE("Unknown imaging values are left out", "[sessiondetails]")
+{
+    auto hdr = Header({
+        "Imaging telescope = iOptron HAE29C EQ, Focal length = unknown, Aperture = unknown",
+        "Imaging camera = ambiguous (2 cameras)",
+        "Filter wheel = ZWO EFW 7x36, Filter = unknown",
+    });
+    CHECK(Fields(hdr) == std::vector<std::string>{
+        "Telescope: iOptron HAE29C EQ",
+    });
+}
