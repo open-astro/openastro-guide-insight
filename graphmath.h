@@ -37,4 +37,10 @@ struct IndexRun
 // graph draws one line per run, leaving gaps where the star was lost.
 std::vector<IndexRun> FoundRuns(const GuideSession::EntryVec& entries, unsigned int i0, unsigned int i1);
 
+// Position of time t (seconds from the start of the session) as a fractional
+// entry index, interpolating between the frames either side of it. Frames
+// are not evenly spaced in time, so this is what places time-axis labels.
+// Times before the first frame or after the last clamp to the ends.
+double IndexAtTime(const GuideSession::EntryVec& entries, double t);
+
 #endif
