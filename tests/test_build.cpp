@@ -1,5 +1,5 @@
 /*
- *  This file is part of phdlogview
+ *  This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  *  Copyright (C) 2026 Open Astro contributors
  *
@@ -25,23 +25,23 @@
 // MSVC only reports the real standard in __cplusplus with /Zc:__cplusplus;
 // _MSVC_LANG is always accurate there.
 #if defined(_MSVC_LANG)
-#define PHDLOGVIEW_CPLUSPLUS _MSVC_LANG
+#define GUIDEINSIGHT_CPLUSPLUS _MSVC_LANG
 #else
-#define PHDLOGVIEW_CPLUSPLUS __cplusplus
+#define GUIDEINSIGHT_CPLUSPLUS __cplusplus
 #endif
 
 TEST_CASE("Compiled as C++20 or newer", "[build]")
 {
-    CHECK(PHDLOGVIEW_CPLUSPLUS >= 202002L);
+    CHECK(GUIDEINSIGHT_CPLUSPLUS >= 202002L);
 }
 
-#ifdef PHDLOGVIEW_EXPECTED_WX_VERSION
+#ifdef GUIDEINSIGHT_EXPECTED_WX_VERSION
 // Release builds pin an exact wxWidgets version; the preset or CI job passes
 // it in. Local development builds against system packages skip this check.
 TEST_CASE("Built against the pinned wxWidgets version", "[build]")
 {
     std::ostringstream actual;
     actual << wxMAJOR_VERSION << '.' << wxMINOR_VERSION << '.' << wxRELEASE_NUMBER;
-    CHECK(actual.str() == PHDLOGVIEW_EXPECTED_WX_VERSION);
+    CHECK(actual.str() == GUIDEINSIGHT_EXPECTED_WX_VERSION);
 }
 #endif

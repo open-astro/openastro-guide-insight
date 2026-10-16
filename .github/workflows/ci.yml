@@ -51,8 +51,8 @@ jobs:
         run: >
           cmake --preset linux
           -DCMAKE_PREFIX_PATH=$HOME/wx
-          -DPHDLOGVIEW_EXPECTED_WX_VERSION=$(cat ~/wx/wxwidgets-version.txt)
-          -DPHDLOGVIEW_WERROR=ON
+          -DGUIDEINSIGHT_EXPECTED_WX_VERSION=$(cat ~/wx/wxwidgets-version.txt)
+          -DGUIDEINSIGHT_WERROR=ON
 
       - name: Build
         run: cmake --build --preset linux -- -k 0
@@ -64,12 +64,12 @@ jobs:
         run: DESTDIR=${{ github.workspace }}/stage cmake --install out/build/linux
 
       - name: Package artifact
-        run: tar -C stage -czf phdlogview-linux-${{ matrix.arch }}.tar.gz .
+        run: tar -C stage -czf openastro-guide-insight-linux-${{ matrix.arch }}.tar.gz .
 
       - uses: actions/upload-artifact@v7
         with:
-          name: phdlogview-linux-${{ matrix.arch }}
-          path: phdlogview-linux-${{ matrix.arch }}.tar.gz
+          name: openastro-guide-insight-linux-${{ matrix.arch }}
+          path: openastro-guide-insight-linux-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
   sanitizers:
@@ -118,19 +118,19 @@ jobs:
             runner: macos-15
             preset: macos-arm64
             triplet: arm64-osx-26
-            artifact: phdlogview-macos-arm64
+            artifact: openastro-guide-insight-macos-arm64
             werror: "ON"
           - name: Windows x64
             runner: windows-latest
             preset: win-x64
             triplet: x64-windows-static
-            artifact: phdlogview-windows-x64
+            artifact: openastro-guide-insight-windows-x64
             werror: "ON"
           - name: Windows ARM64
             runner: windows-11-arm
             preset: win-arm64
             triplet: arm64-windows-static
-            artifact: phdlogview-windows-arm64
+            artifact: openastro-guide-insight-windows-arm64
             werror: "ON"
     runs-on: ${{ matrix.runner }}
     env:
@@ -172,7 +172,7 @@ jobs:
             vcpkg-${{ matrix.triplet }}-
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DPHDLOGVIEW_WERROR=${{ matrix.werror }}
+        run: cmake --preset ${{ matrix.preset }} -DGUIDEINSIGHT_WERROR=${{ matrix.werror }}
 
       - name: Upload vcpkg logs on failure
         if: failure()
