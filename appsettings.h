@@ -55,6 +55,13 @@ struct DisplayOptions
     WhichMount device = MOUNT; // whose corrections to show; not saved
 };
 
+// How the Drift and Frequency charts analyse the frames.
+struct AnalysisOptions
+{
+    bool driftCorrection = true; // remove a straight-line drift first (#19)
+    bool rawRa = false;          // add the RA guide pulses back
+};
+
 struct AppSettings
 {
     ExclusionSettings exclusions;
@@ -63,6 +70,7 @@ struct AppSettings
     double verticalLock = 0.; // locked vertical scale, pixels per arc-second
     wxString openDir;
     DisplayOptions display;
+    AnalysisOptions analysis;
     ChartKind view = ChartKind::Timeline;
     bool sidebarShown = true, inspectorShown = true;
     int sidebarWidth = 230, inspectorWidth = 290;

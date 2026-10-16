@@ -133,6 +133,21 @@ TEST_CASE("Settings survive a save and a load", "[appsettings]")
     CHECK(t.geometry->width == 1000);
 }
 
+TEST_CASE("Analysis options are saved", "[appsettings]")
+{
+    wxFileConfig c = Config("");
+    AppSettings s = LoadSettings(c);
+    CHECK(s.analysis.driftCorrection);
+    CHECK_FALSE(s.analysis.rawRa);
+
+    s.analysis.driftCorrection = false;
+    s.analysis.rawRa = true;
+    SaveSettings(c, s);
+    AppSettings t = LoadSettings(c);
+    CHECK_FALSE(t.analysis.driftCorrection);
+    CHECK(t.analysis.rawRa);
+}
+
 TEST_CASE("Choosing the theme colour again forgets the saved one", "[appsettings]")
 {
     wxFileConfig c = Config("[color]\nra=#123456\n");
