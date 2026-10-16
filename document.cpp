@@ -56,20 +56,6 @@ static double MaxScale(const GuideSession::EntryVec& entries, XAxis axis)
     return MAX_PIXELS_PER_FRAME;
 }
 
-// The x-axis position of a fractional entry index.
-static double PositionAtIndex(const GuideSession::EntryVec& entries, double index, XAxis axis)
-{
-    if (axis == XAxis::Frames || entries.empty())
-        return index;
-    double last = (double) (entries.size() - 1);
-    index = std::clamp(index, 0., last);
-    size_t i = (size_t) floor(index);
-    if ((double) i >= last)
-        return entries.back().dt;
-    double frac = index - (double) i;
-    return entries[i].dt + frac * (entries[i + 1].dt - entries[i].dt);
-}
-
 static Viewport NewViewport(const GuideSession::EntryVec& entries, XAxis axis)
 {
     Viewport v(MaxScale(entries, axis));
@@ -175,9 +161,18 @@ void Document::IncludeSelection(bool include)
     if (!s)
         return;
     if (m_selection)
-        IncludeFrames(*s, *m_selection, include);
+        ::IncludeFrames(*s, *m_selection, include);
     else
         IncludeRange(s->entries, include);
+    s->CalcStats();
+}
+
+void Document::IncludeFrames(const IndexRun& run, bool include)
+{
+    GuideSession *s = Session();
+    if (!s || run.first > run.last)
+        return;
+    ::IncludeFrames(*s, run, include);
     s->CalcStats();
 }
 
@@ -227,6 +222,7 @@ void Document::FitVertical(double height)
     if (!v)
         return;
     v->vertical.Fit(MaxOffset(*Session()), height);
+    v->verticalFitted = true;
     if (VerticalScaleLocked())
         m_lock = v->vertical.Scale() / Session()->pixelScale;
 }

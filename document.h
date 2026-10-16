@@ -57,6 +57,7 @@ struct SessionView
 {
     Viewport horizontal{ 1. };
     VerticalView vertical;
+    bool verticalFitted = false; // fitted to the chart's height yet
 };
 
 class Document
@@ -103,6 +104,8 @@ public:
     GuideStats Stats() const;
     // Includes or excludes the selection, or every frame without one.
     void IncludeSelection(bool include);
+    // Includes or excludes a run of frames, leaving the selection alone.
+    void IncludeFrames(const IndexRun& run, bool include);
     // Includes or excludes every frame of the current session.
     void IncludeAll(bool include);
 

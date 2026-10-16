@@ -22,6 +22,7 @@
 #include "graphmath.h"
 
 #include <algorithm>
+#include <math.h>
 
 // Room for rounding error when comparing scales.
 static const double EPS = 1e-9;
@@ -139,6 +140,19 @@ double VerticalView::ValueAt(double y, double height) const
 double AxisPosition(const GuideSession::EntryVec& entries, size_t i, XAxis axis)
 {
     return axis == XAxis::Time ? (double) entries[i].dt : (double) i;
+}
+
+double PositionAtIndex(const GuideSession::EntryVec& entries, double index, XAxis axis)
+{
+    if (axis == XAxis::Frames || entries.empty())
+        return index;
+    double last = (double) (entries.size() - 1);
+    index = std::clamp(index, 0., last);
+    size_t i = (size_t) floor(index);
+    if ((double) i >= last)
+        return entries.back().dt;
+    double frac = index - (double) i;
+    return entries[i].dt + frac * (entries[i + 1].dt - entries[i].dt);
 }
 
 double IndexAtPosition(const GuideSession::EntryVec& entries, double position, XAxis axis)
