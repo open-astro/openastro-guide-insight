@@ -339,9 +339,9 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         else if (StartsWith(line, "Norm rates RA = "))
         {
             m.calRateRa = Positive(line.substr(16)).value_or(0.);
-            size_t dec = line.find(", Dec = ");
-            if (dec != std::string::npos)
-                m.calRateDec = Positive(line.substr(dec + 8)).value_or(0.);
+            size_t decAt = line.find(", Dec = ");
+            if (decAt != std::string::npos)
+                m.calRateDec = Positive(line.substr(decAt + 8)).value_or(0.);
             size_t ortho = line.find("ortho.err. = ");
             if (ortho != std::string::npos)
                 m.orthoError = Leading(line.substr(ortho + 13)).value_or(-1.);
@@ -363,7 +363,7 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
     }
 
     std::vector<double> ditherSizes, settleTimes;
-    std::optional<double> settleStart;
+    double settleStart = NAN; // when the current settling started, NaN when none
     for (const InfoEntry& info : session.infos)
     {
         if (info.idx >= (int) end)
@@ -388,10 +388,10 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         double at = entries.empty() ? 0. : entries[std::min<size_t>(info.idx, entries.size() - 1)].dt;
         if (StartsWith(info.info, "Settling started"))
             settleStart = at;
-        else if (StartsWith(info.info, "Settling complete") && settleStart)
+        else if (StartsWith(info.info, "Settling complete") && !isnan(settleStart))
         {
-            settleTimes.push_back(at - *settleStart);
-            settleStart.reset();
+            settleTimes.push_back(at - settleStart);
+            settleStart = NAN;
         }
     }
 
