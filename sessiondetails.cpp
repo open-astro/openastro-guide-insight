@@ -19,7 +19,11 @@
 
 #include "sessiondetails.h"
 
+#include "labels.h"
+
 #include <charconv>
+#include <math.h>
+#include <optional>
 #include <map>
 
 namespace {
@@ -185,5 +189,100 @@ std::vector<DetailField> SessionDetails(const wxArrayString& hdr)
         if (it != found.end())
             fields.push_back(DetailField{ it->first, it->second });
     }
+    return fields;
+}
+
+namespace {
+
+// A number with a decimal point, whatever the locale. (std::from_chars for
+// doubles is missing from the C++ library of the macOS build machines.)
+std::optional<double> Number(const std::string& text)
+{
+    double v;
+    if (!wxString::FromUTF8(text).ToCDouble(&v))
+        return std::nullopt;
+    return v;
+}
+
+struct AxisResult
+{
+    std::string rate;  // pixels per second, as logged
+    std::string angle; // degrees, as logged
+};
+
+// "West calibration complete. Angle = -114.5 deg, Rate = 0.822 px/sec, Parity = Even"
+AxisResult AxisFrom(const std::string& line)
+{
+    return AxisResult{ StripSuffix(Setting(line, "Rate"), " px/sec"), StripSuffix(Setting(line, "Angle"), " deg") };
+}
+
+} // namespace
+
+std::vector<DetailField> CalibrationDetails(const Calibration& cal)
+{
+    std::optional<double> pixelScale;
+    std::optional<AxisResult> ra, dec;
+    std::string step;
+
+    for (const wxString& wxln : cal.hdr)
+    {
+        std::string line(wxln.utf8_str());
+        if (StartsWith(line, "Pixel scale = "))
+            pixelScale = Number(StripSuffix(FirstItem(line.substr(14)), " arc-sec/px"));
+        else if (StartsWith(line, "West calibration complete."))
+            ra = AxisFrom(line);
+        else if (StartsWith(line, "North calibration complete."))
+            dec = AxisFrom(line);
+        else if ((StartsWith(line, "Mount = ") || StartsWith(line, "AO = ")) &&
+                 line.find("Calibration Step = ") != std::string::npos)
+        {
+            std::string distance = Setting(line, "Calibration Distance");
+            step = Setting(line, "Calibration Step") + (distance.empty() ? "" : ", " + distance + " target");
+        }
+    }
+
+    std::vector<DetailField> fields;
+    auto rate = [&](const char *label, const AxisResult& axis) {
+        std::string text = axis.rate + " px/s";
+        std::optional<double> r = Number(axis.rate);
+        if (r && pixelScale)
+            text += " \u00b7 " + Fixed(*r * *pixelScale, 2) + "\u2033/s";
+        fields.push_back(DetailField{ label, text });
+    };
+    auto angle = [](const std::string& degrees) {
+        std::optional<double> a = Number(degrees);
+        return a ? Fixed(*a, 1) + "\u00b0" : degrees;
+    };
+
+    if (ra)
+        rate("RA rate", *ra);
+    if (dec)
+        rate("Dec rate", *dec);
+    if (ra)
+        fields.push_back(DetailField{ "RA angle", angle(ra->angle) });
+    if (dec)
+        fields.push_back(DetailField{ "Dec angle", angle(dec->angle) });
+    if (ra && dec)
+    {
+        std::optional<double> a = Number(ra->angle), b = Number(dec->angle);
+        if (a && b)
+        {
+            double between = fabs(remainder(*a - *b, 360.));
+            fields.push_back(DetailField{ "Orthogonality error", Fixed(fabs(between - 90.), 1) + "\u00b0" });
+        }
+    }
+    if (!step.empty())
+        fields.push_back(DetailField{ "Step size", step });
+
+    int counts[5] = {};
+    for (const auto& e : cal.entries)
+        counts[e.direction]++;
+    std::string steps;
+    // in the order a calibration goes: west, east, backlash clearing, north, south
+    for (CalDirection d : { WEST, EAST, BACKLASH, NORTH, SOUTH })
+        if (counts[d])
+            steps += (steps.empty() ? "" : " \u00b7 ") + std::string(1, "WEBNS"[d]) + " " + std::to_string(counts[d]);
+    if (!steps.empty())
+        fields.push_back(DetailField{ "Steps", steps });
     return fields;
 }

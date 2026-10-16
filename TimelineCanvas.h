@@ -36,7 +36,7 @@
 
 #include <optional>
 
-class TimelineCanvas : public wxWindow
+class TimelineCanvas : public wxWindow, public Chart
 {
     enum class Drag { None, Select, Exclude, Include, PanVertical };
 
@@ -80,8 +80,10 @@ public:
     // The current session's view, sized to the plot.
     SessionView *View();
 
-    void ZoomBy(double factor);
-    void ZoomToFit();
+    void ZoomBy(double factor) override;
+    void ZoomToFit() override;
+    bool CanZoomIn() override;
+    bool CanZoomOut() override;
     void ZoomToSelection();
     void FitVertical();
     void ClearHover() { SetHover(std::nullopt); }

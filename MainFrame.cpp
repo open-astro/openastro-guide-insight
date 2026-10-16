@@ -275,19 +275,16 @@ void MainFrame::BuildMenus()
         e.Enable(m_doc.Selection().has_value() && m_settings.view == ChartKind::Timeline);
     }, ID_ZOOM_SELECTION);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        SessionView *v = m_doc.View();
-        bool timeline = v && m_settings.view == ChartKind::Timeline;
+        Chart *chart = m_doc.Current() ? m_chart->ActiveChart() : nullptr;
         switch (e.GetId())
         {
         case ID_ZOOM_IN:
-            e.Enable(timeline && v->horizontal.CanZoomIn());
+            e.Enable(chart && chart->CanZoomIn());
             break;
         case ID_ZOOM_OUT:
         case ID_ZOOM_FIT:
-            e.Enable(timeline && v->horizontal.CanZoomOut());
+            e.Enable(chart && chart->CanZoomOut());
             break;
-        default:
-            e.Enable(timeline);
         }
     }, ID_ZOOM_IN, ID_ZOOM_FIT);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
@@ -608,16 +605,19 @@ void MainFrame::OnIncludeSelection(wxCommandEvent& event)
 void MainFrame::OnZoom(wxCommandEvent& event)
 {
     TimelineCanvas *t = m_chart->Timeline();
+    Chart *chart = m_chart->ActiveChart();
+    if (!chart)
+        return;
     switch (event.GetId())
     {
     case ID_ZOOM_IN:
-        t->ZoomBy(2.);
+        chart->ZoomBy(2.);
         break;
     case ID_ZOOM_OUT:
-        t->ZoomBy(0.5);
+        chart->ZoomBy(0.5);
         break;
     case ID_ZOOM_FIT:
-        t->ZoomToFit();
+        chart->ZoomToFit();
         break;
     case ID_ZOOM_SELECTION:
         t->ZoomToSelection();
@@ -636,6 +636,8 @@ void MainFrame::FramesChanged()
 void MainFrame::SelectionChanged()
 {
     m_inspector->ShowDocument(m_doc, m_settings);
+    if (m_settings.view == ChartKind::Scatter)
+        UpdateChart();
     m_chart->RefreshChart();
 }
 
@@ -742,14 +744,35 @@ void MainFrame::UpdateChart()
     m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), wxEmptyString);
     if (m_doc.CalibrationSection())
     {
-        m_chart->SetLegend(wxEmptyString, wxEmptyString);
-        m_chart->SetDefaultStatus(wxEmptyString);
-        m_chart->ShowMessage("Calibration");
+        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), "Camera pixels from the start");
+        m_chart->SetLegend("West", "North");
+        m_chart->SetDefaultStatus(wxString::FromUTF8(
+#ifdef __WXOSX__
+            "Drag to pan · pinch or ⌘-scroll to zoom · point at a step to see it"
+#else
+            "Drag to pan · Ctrl-scroll to zoom · point at a step to see it"
+#endif
+            ));
+        m_chart->ShowCalibration();
         return;
     }
 
     bool radec = m_settings.display.raDecAxes;
     m_chart->SetLegend(radec ? "RA" : "dx", radec ? "Dec" : "dy");
+    if (m_settings.view == ChartKind::Scatter)
+    {
+        const GuideSession *s = m_doc.Session();
+        size_t frames = m_doc.Selection() ? m_doc.Selection()->last - m_doc.Selection()->first + 1 : s->entries.size();
+        m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)),
+                            wxString::FromUTF8(std::string(radec ? "RA against Dec" : "dx against dy") +
+                                               (m_doc.Selection() ? " \u00b7 selected frames" : " \u00b7 whole session")));
+        m_chart->SetLegend(wxEmptyString, wxEmptyString);
+        m_chart->SetDefaultStatus(wxString::FromUTF8(Summarize(m_doc.Stats(), frames, s->pixelScale,
+                                                                m_settings.display.units).frames +
+                                                      (radec ? " \u00b7 the ellipse spans two standard deviations" : "")));
+        m_chart->ShowScatter();
+        return;
+    }
     if (m_settings.view != ChartKind::Timeline)
     {
         m_chart->SetDefaultStatus(wxEmptyString);
