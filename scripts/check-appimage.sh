@@ -11,9 +11,11 @@ app=$(realpath "${1:?usage: $0 APP.AppImage VERSION}")
 version=${2:?usage: $0 APP.AppImage VERSION}
 
 export APPIMAGE_EXTRACT_AND_RUN=1
-got=$(xvfb-run -a "$app" --version)
 want="OpenAstro Guide Insight $version"
-if [[ $got != "$want" ]]; then
+# xvfb-run mixes in the app's stderr, where GTK may warn about the
+# missing accessibility bus; look for the version line itself
+got=$(xvfb-run -a "$app" --version 2>&1)
+if ! grep -Fxq "$want" <<<"$got"; then
   echo "check-appimage: expected \"$want\", got \"$got\"" >&2
   exit 1
 fi
