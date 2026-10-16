@@ -69,6 +69,7 @@ public:
     double First() const { return m_offset; }
     double Last() const { return m_offset + m_width / m_scale; }
     double Scale() const { return m_scale; }
+    double Width() const { return m_width; }
     bool CanZoomIn() const;
     bool CanZoomOut() const;
 };
