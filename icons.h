@@ -20,7 +20,7 @@
 #ifndef ICONS_INCLUDED
 #define ICONS_INCLUDED
 
-// Toolbar icons, drawn from SVG so they are sharp at any resolution.
+// Toolbar icons, drawn at 1x and 2x so they are sharp on high-DPI displays.
 
 #include <wx/bmpbndl.h>
 #include <wx/colour.h>
