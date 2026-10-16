@@ -157,19 +157,33 @@ void SessionSidebar::SetLog(const GuideLog& log, std::optional<size_t> current, 
 {
     m_updating = true;
 
-    m_rows.clear();
+    std::vector<SectionRow> rows;
     for (size_t i = 0; i < log.sections.size(); i++)
-        m_rows.push_back(RowFor(log, i, units));
+        rows.push_back(RowFor(log, i, units));
 
-    m_list->DeleteAllItems();
-    for (size_t i = 0; i < m_rows.size(); i++)
+    // the same sections as before: redraw them in place, keeping the
+    // list's scroll position and focus
+    bool same = rows.size() == m_rows.size() &&
+        std::equal(rows.begin(), rows.end(), m_rows.begin(), [](const SectionRow& a, const SectionRow& b) {
+            return a.calibration == b.calibration && a.kind == b.kind;
+        });
+    m_rows = std::move(rows);
+    if (same)
+        m_list->Refresh();
+    else
     {
-        wxVector<wxVariant> values;
-        values.push_back(wxVariant((long) i));
-        m_list->AppendItem(values);
+        m_list->DeleteAllItems();
+        for (size_t i = 0; i < m_rows.size(); i++)
+        {
+            wxVector<wxVariant> values;
+            values.push_back(wxVariant((long) i));
+            m_list->AppendItem(values);
+        }
     }
-    if (current && *current < m_rows.size())
+    if (current && *current < m_rows.size() && m_list->GetSelectedRow() != (int) *current)
         m_list->SelectRow((unsigned int) *current);
+    else if (!current)
+        m_list->UnselectAll();
 
     // the day the log starts, from its first section
     wxDateTime start;

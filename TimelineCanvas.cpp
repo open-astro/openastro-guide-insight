@@ -20,6 +20,7 @@
 #include "TimelineCanvas.h"
 
 #include "chartdraw.h"
+#include "commands.h"
 #include "labels.h"
 #include "ticks.h"
 
@@ -31,14 +32,6 @@
 #include <memory>
 
 namespace {
-
-enum
-{
-    ID_EXCLUDE_SELECTION = wxID_HIGHEST + 100,
-    ID_INCLUDE_SELECTION,
-    ID_ZOOM_SELECTION,
-    ID_CLEAR_SELECTION,
-};
 
 const int DRAG_THRESHOLD = 3;
 
@@ -648,33 +641,27 @@ void TimelineCanvas::OnKeyDown(wxKeyEvent& event)
 
 void TimelineCanvas::OnContextMenu(wxContextMenuEvent& event)
 {
-    Document& doc = m_host.Doc();
-    if (!doc.Session())
+    if (!m_host.Doc().Session())
         return;
 
+    // the main window handles these, and enables them as its menus do
     wxMenu menu;
-    bool sel = doc.Selection().has_value();
-    menu.Append(ID_EXCLUDE_SELECTION, "Exclude Selected Frames")->Enable(sel);
-    menu.Append(ID_INCLUDE_SELECTION, "Include Selected Frames")->Enable(sel);
-    menu.Append(ID_ZOOM_SELECTION, "Zoom to Selection")->Enable(sel);
-    menu.Append(ID_CLEAR_SELECTION, "Deselect")->Enable(sel);
+    menu.Append(ID_EXCLUDE_SELECTION, "Exclude Selected Frames");
+    menu.Append(ID_INCLUDE_SELECTION, "Include Selected Frames");
+    menu.Append(ID_ZOOM_SELECTION, "Zoom to Selection");
+    menu.Append(ID_DESELECT, "Deselect");
+    menu.AppendSeparator();
+    // check items: the main window checks the view being shown
+    menu.AppendCheckItem(ID_VIEW_DRIFT, "Show Drift");
+    menu.AppendCheckItem(ID_VIEW_FREQUENCY, "Show Frequency");
+    menu.Append(ID_SELECT_GA, "Select Guiding Assistant Run");
+    menu.AppendSeparator();
+    menu.Append(ID_INCLUDE_ALL, "Include All Frames");
+    menu.Append(ID_EXCLUDE_ALL, "Exclude All Frames");
+    menu.Append(ID_REAPPLY_RULES, "Reapply Exclusion Rules");
 
-    int id = GetPopupMenuSelectionFromUser(menu, ScreenToClient(event.GetPosition()));
-    switch (id)
-    {
-    case ID_EXCLUDE_SELECTION:
-    case ID_INCLUDE_SELECTION:
-        doc.IncludeSelection(id == ID_INCLUDE_SELECTION);
-        m_host.FramesChanged();
-        break;
-    case ID_ZOOM_SELECTION:
-        ZoomToSelection();
-        break;
-    case ID_CLEAR_SELECTION:
-        doc.SetSelection(std::nullopt);
-        m_host.SelectionChanged();
-        break;
-    }
+    wxPoint pos = event.GetPosition() == wxDefaultPosition ? wxDefaultPosition : ScreenToClient(event.GetPosition());
+    PopupMenu(&menu, pos);
 }
 
 void TimelineCanvas::ZoomBy(double factor)

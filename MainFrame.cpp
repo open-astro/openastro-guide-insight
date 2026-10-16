@@ -25,6 +25,7 @@
 #include "SegmentedControl.h"
 #include "SessionSidebar.h"
 #include "TimelineCanvas.h"
+#include "commands.h"
 #include "periodogram.h"
 #include "icons.h"
 #include "labels.h"
@@ -56,31 +57,6 @@
 
 namespace {
 
-enum
-{
-    ID_OPEN_IN_EDITOR = wxID_HIGHEST + 1,
-    ID_VIEW_TIMELINE,
-    ID_VIEW_SCATTER,
-    ID_VIEW_DRIFT,
-    ID_VIEW_FREQUENCY,
-    ID_TOGGLE_SIDEBAR,
-    ID_TOGGLE_INSPECTOR,
-    ID_INCLUDE_ALL,
-    ID_EXCLUDE_ALL,
-    ID_REAPPLY_RULES,
-    ID_DESELECT,
-    ID_EXCLUDE_SELECTION,
-    ID_INCLUDE_SELECTION,
-    ID_ZOOM_IN,
-    ID_ZOOM_OUT,
-    ID_ZOOM_FIT,
-    ID_ZOOM_SELECTION,
-    ID_FIT_VERTICAL,
-    ID_LOCK_VERTICAL,
-    ID_EXPORT_CSV,
-    ID_SELECT_GA,
-};
-
 const wxString VIEW_NAMES[] = { "Timeline", "Scatter", "Drift", "Frequency" };
 
 struct FileDropTarget : public wxFileDropTarget
@@ -101,23 +77,89 @@ wxString U(const std::string& utf8)
     return wxString::FromUTF8(utf8);
 }
 
+// The Help window's text. CMD, OPT and SHIFT become the platform's names
+// for those keys.
 const char *HELP_HTML =
     "<html><body>"
+    "<h2>OpenAstro Guide Insight</h2>"
+    "<p>See how well PHD2 guided: open a guide log, pick a session, and read the chart and the inspector.</p>"
+
     "<h3>Opening a guide log</h3>"
-    "<p>Choose <b>File &rsaquo; Open</b>, pick one from <b>Open Recent</b>, or drag a "
-    "PHD2_GuideLog file onto the window. You can also open one from the command line.</p>"
+    "<p>Choose <b>File &rsaquo; Open</b> (CMD+O) or <b>Open Recent</b>, drag a <i>PHD2_GuideLog</i> file onto the "
+    "window, or open one from the command line. PHD2 keeps its logs in its own folder, Documents/PHD2 by "
+    "default. A debug log is not a guide log; the app says so if you open one.</p>"
+
     "<h3>The window</h3>"
-    "<p>The <b>sidebar</b> lists the log's calibrations and guiding sessions. Choose one to show it.</p>"
-    "<p>The <b>toolbar</b> switches the chart between Timeline, Scatter, Drift and Frequency "
-    "(&#8984;1 to &#8984;4 on a Mac, Ctrl+1 to Ctrl+4 elsewhere).</p>"
-    "<p>The <b>inspector</b> on the right shows the statistics, the session's equipment and settings, "
-    "display options and the exclusion rules. Hide either side from the View menu.</p>"
+    "<ul>"
+    "<li>The <b>sidebar</b> lists the log's calibrations and guiding sessions with their start, length and total RMS. "
+    "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between them.</li>"
+    "<li>The <b>toolbar</b> switches the chart between Timeline, Scatter, Drift and Frequency (CMD+1 to CMD+4).</li>"
+    "<li>The <b>inspector</b> shows the statistics, drift and polar alignment, the session's equipment and "
+    "settings (with the raw header), display options, analysis options and exclusion rules.</li>"
+    "<li>Hide the sidebar or the inspector from the View menu or the toolbar.</li>"
+    "</ul>"
+
+    "<h3>Timeline</h3>"
+    "<ul>"
+    "<li>Scroll to pan; pinch or CMD-scroll to zoom about the pointer; OPT-scroll to stretch the vertical axis "
+    "and OPT-drag to move it. The strip under the chart shows the whole session: drag its highlight or click to jump.</li>"
+    "<li>Point at the chart to read a frame in the status line: its time, offsets, guide pulses, SNR and star mass.</li>"
+    "<li>Guide pulses are bars from the zero line: up for West and North pulses, down for East and South.</li>"
+    "<li><b>Drag</b> to select frames. The inspector then shows the selection's statistics, and Drift, Frequency "
+    "and Scatter analyse just those frames. Esc deselects.</li>"
+    "<li>CMD-drag excludes frames from the statistics and SHIFT-drag includes them. CMD-click an excluded "
+    "stretch to include it again. Right-click for more.</li>"
+    "<li>Display options choose arc-seconds or pixels, RA/Dec or the camera's dx/dy, frames or time across, "
+    "and which series to show. <b>Lock vertical scale</b> keeps the same scale, in arc-seconds, for every session.</li>"
+    "</ul>"
+
+    "<h3>Scatter</h3>"
+    "<p>Each counted frame's RA against Dec, with scale rings and an ellipse two standard deviations wide "
+    "that shows any elongation.</p>"
+
+    "<h3>Drift and Frequency</h3>"
+    "<p>These analyse the selection, or the whole session without one. <b>Edit &rsaquo; Select Guiding Assistant "
+    "Run</b> selects a stretch where PHD2's Guiding Assistant had guide output off.</p>"
+    "<ul>"
+    "<li><b>Drift</b> shows RA and Dec with the straight-line drift taken out; turn that off in the inspector's "
+    "Analysis section to see the raw drift.</li>"
+    "<li><b>Frequency</b> is RA's periodogram: periodic error shows as peaks. Point at the curve to read a peak. "
+    "<i>Add back RA guide pulses</i> estimates the error guiding was correcting. "
+    "<b>File &rsaquo; Export Periodogram as CSV</b> saves it.</li>"
+    "</ul>"
+
     "<h3>Statistics</h3>"
-    "<p>Statistics count the frames where the star was found and that are not excluded. "
-    "<b>Edit &rsaquo; Copy Statistics</b> copies them as CSV.</p>"
-    "<p>Exclusion rules in the inspector leave out frames while PHD2 settles after a dither, "
-    "and while a client has paused guiding. The distance rule's settings are in Preferences.</p>"
+    "<p>Statistics count the frames where the star was found that are not excluded. The exclusion rules leave "
+    "out settling after a dither (as PHD2 reports it, or until the star stays within the distance set in "
+    "Preferences) and time while a client paused guiding. <b>Edit &rsaquo; Copy Statistics</b> copies them as CSV.</p>"
+
+    "<h3>Calibration</h3>"
+    "<p>Choose a calibration to see each step from the starting point, and its rates, angles and orthogonality "
+    "error in the inspector. Drag to pan, pinch or CMD-scroll to zoom.</p>"
     "</body></html>";
+
+// The help text in the palette's colours, with the platform's key names.
+// Keys are spelled out, as Apple's style guide does on macOS ("Command-O"),
+// because the HTML window sets the key symbols off the line.
+wxString HelpHtml(const Palette& pal)
+{
+    wxString html = HELP_HTML;
+#ifdef __WXOSX__
+    html.Replace("CMD+OPT+", "Command-Option-");
+    html.Replace("CMD+", "Command-");
+    html.Replace("CMD", "Command");
+    html.Replace("OPT", "Option");
+    html.Replace("SHIFT", "Shift");
+#else
+    html.Replace("CMD", "Ctrl");
+    html.Replace("OPT", "Alt");
+    html.Replace("SHIFT", "Shift");
+#endif
+    html.Replace("<body>", wxString::Format("<body bgcolor='%s' text='%s'>",
+                                            pal.chart.GetAsString(wxC2S_HTML_SYNTAX),
+                                            pal.text.GetAsString(wxC2S_HTML_SYNTAX)));
+    return html;
+}
 
 } // namespace
 
@@ -217,6 +259,9 @@ void MainFrame::BuildMenus()
     view->AppendCheckItem(ID_LOCK_VERTICAL, "Loc&k Vertical Scale",
                           "Use the same vertical scale, in arc-seconds, for every session");
     view->AppendSeparator();
+    view->Append(ID_PREVIOUS_SECTION, "&Previous Section\tCtrl+Alt+Up");
+    view->Append(ID_NEXT_SECTION, "&Next Section\tCtrl+Alt+Down");
+    view->AppendSeparator();
 #ifdef __WXOSX__
     view->AppendCheckItem(ID_TOGGLE_SIDEBAR, "Show &Sidebar\tCtrl+RawCtrl+S");
 #else
@@ -261,6 +306,20 @@ void MainFrame::BuildMenus()
          ID_VIEW_TIMELINE, ID_VIEW_FREQUENCY);
     Bind(wxEVT_MENU, &MainFrame::OnSelectAll, this, wxID_SELECTALL);
     Bind(wxEVT_MENU, &MainFrame::OnExportCsv, this, ID_EXPORT_CSV);
+    Bind(wxEVT_MENU, [this](wxCommandEvent& e) {
+        if (!m_doc.Current())
+            return;
+        size_t current = *m_doc.Current();
+        if (e.GetId() == ID_PREVIOUS_SECTION && current > 0)
+            SelectSection(current - 1);
+        else if (e.GetId() == ID_NEXT_SECTION && current + 1 < m_doc.Log().sections.size())
+            SelectSection(current + 1);
+    }, ID_PREVIOUS_SECTION, ID_NEXT_SECTION);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        auto current = m_doc.Current();
+        e.Enable(current && (e.GetId() == ID_PREVIOUS_SECTION ? *current > 0
+                                                              : *current + 1 < m_doc.Log().sections.size()));
+    }, ID_PREVIOUS_SECTION, ID_NEXT_SECTION);
     Bind(wxEVT_MENU, &MainFrame::OnSelectGuidingAssistant, this, ID_SELECT_GA);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
         e.Enable(m_settings.view == ChartKind::Frequency && Analysis() != nullptr);
@@ -396,6 +455,10 @@ void MainFrame::ApplyPalette()
     m_chart->ApplyPalette();
     m_views->SetPalette(m_palette);
     UpdateToolIcons();
+    if (m_helpWindow)
+        for (wxWindow *child : m_helpWindow->GetChildren())
+            if (auto html = dynamic_cast<wxHtmlWindow *>(child))
+                html->SetPage(HelpHtml(m_palette));
 }
 
 void MainFrame::OnSysColourChanged(wxSysColourChangedEvent& event)
@@ -441,6 +504,8 @@ void MainFrame::Open(const wxString& path)
     ChooseDevice();
 
     UpdateAll();
+    // the arrow keys move between sections straight away
+    m_sidebar->FocusList();
 
     if (log.is_debug_log)
     {
@@ -542,7 +607,7 @@ void MainFrame::OnHelp(wxCommandEvent&)
         auto frame = new wxFrame(this, wxID_ANY, APP_NAME " Help", wxDefaultPosition, FromDIP(wxSize(560, 520)),
                                  wxDEFAULT_FRAME_STYLE | wxFRAME_FLOAT_ON_PARENT);
         auto html = new wxHtmlWindow(frame, wxID_ANY);
-        html->SetPage(HELP_HTML);
+        html->SetPage(HelpHtml(m_palette));
         frame->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
             m_helpWindow = nullptr;
             e.Skip();

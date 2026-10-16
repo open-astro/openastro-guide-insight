@@ -25,6 +25,53 @@
 
 #include <memory>
 
+#if wxUSE_ACCESSIBILITY
+#include <wx/access.h>
+
+// Lets screen readers see the heading as a button that opens and closes
+// its section.
+class SectionHeaderAccessible : public wxAccessible
+{
+    SectionHeader *Header() { return static_cast<SectionHeader *>(GetWindow()); }
+
+public:
+    explicit SectionHeaderAccessible(SectionHeader *header) : wxAccessible(header) { }
+
+    wxAccStatus GetName(int, wxString *name) override
+    {
+        *name = Header()->m_title;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetRole(int, wxAccRole *role) override
+    {
+        *role = wxROLE_SYSTEM_PUSHBUTTON;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetState(int, long *state) override
+    {
+        *state = wxACC_STATE_SYSTEM_FOCUSABLE |
+            (Header()->m_open ? wxACC_STATE_SYSTEM_EXPANDED : wxACC_STATE_SYSTEM_COLLAPSED);
+        if (Header()->HasFocus())
+            *state |= wxACC_STATE_SYSTEM_FOCUSED;
+        return wxACC_OK;
+    }
+
+    wxAccStatus GetDefaultAction(int, wxString *action) override
+    {
+        *action = Header()->m_open ? "Collapse" : "Expand";
+        return wxACC_OK;
+    }
+
+    wxAccStatus DoDefaultAction(int) override
+    {
+        Header()->Toggle();
+        return wxACC_OK;
+    }
+};
+#endif
+
 SectionHeader::SectionHeader(wxWindow *parent, const wxString& title, bool small)
     : m_title(title), m_small(small), m_palette(CurrentPalette())
 {
@@ -36,6 +83,9 @@ SectionHeader::SectionHeader(wxWindow *parent, const wxString& title, bool small
     SetFont(small ? GetFont().Smaller() : GetFont().Bold());
     SetCursor(wxCursor(wxCURSOR_HAND));
     SetInitialSize(DoGetBestSize());
+#if wxUSE_ACCESSIBILITY
+    SetAccessible(new SectionHeaderAccessible(this));
+#endif
 
     Bind(wxEVT_PAINT, &SectionHeader::OnPaint, this);
     Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) {
