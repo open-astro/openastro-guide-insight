@@ -21,9 +21,11 @@
 #define INSPECTOR_INCLUDED
 
 // The column of collapsible sections down the right of the window: the
-// statistics, session details, display options and exclusion rules.
+// assessment, statistics, session details, display options and exclusion
+// rules.
 
 #include "appsettings.h"
+#include "assessment.h"
 #include "document.h"
 #include "sessiondetails.h"
 #include "theme.h"
@@ -54,6 +56,20 @@ class Inspector : public wxScrolledWindow
 
     Palette m_palette;
     wxStaticText *m_empty;
+
+    Section m_assessment;
+    Assessment m_shown;           // what the assessment section shows
+    bool m_assessed = false;
+    // text that wraps to the inspector's width, with its unwrapped label and
+    // how far it is indented
+    struct Wrapped
+    {
+        wxStaticText *text;
+        wxString label;
+        int indent;
+    };
+    std::vector<Wrapped> m_wrapped;
+    int m_wrapWidth = 0;
 
     Section m_summary;
     wxStaticText *m_total, *m_alt, *m_ra, *m_dec, *m_peak, *m_elongation, *m_frames;
@@ -99,6 +115,9 @@ class Inspector : public wxScrolledWindow
     void AlignLabels();
     void FillFields(wxWindow *parent, wxFlexGridSizer *grid, const std::vector<DetailField>& fields);
     void Relayout();
+    void ShowAssessment(const Assessment& a);
+    void FillAssessment();
+    void WrapTexts();
     ExclusionSettings Rules() const;
     DisplayOptions Options() const;
 
@@ -111,6 +130,8 @@ public:
     std::function<void()> onSelectGuidingAssistant;
     std::function<void(const ExclusionSettings&)> onExclusions;
     std::function<void(bool include)> onIncludeAll;
+    // The assessment's "Show on the timeline" link for a run of frames.
+    std::function<void(const IndexRun&)> onShowFrames;
 
     // Shows what the document's current section and selection hold.
     void ShowDocument(const Document& doc, const AppSettings& settings);
