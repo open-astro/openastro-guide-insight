@@ -31,6 +31,7 @@
 #include "selection.h"
 #include "viewport.h"
 
+#include <functional>
 #include <iosfwd>
 #include <optional>
 #include <vector>
@@ -74,7 +75,9 @@ public:
     // Reads a log, applies the exclusion settings to every session and works
     // out the statistics. The first section becomes current. If the stream
     // cannot be read, returns false and keeps the log already open.
-    bool Load(std::istream& is);
+    // `progress` is called now and then while reading, so a GUI can stay
+    // responsive.
+    bool Load(std::istream& is, const std::function<void()>& progress = {});
 
     const GuideLog& Log() const { return m_log; }
 
@@ -100,6 +103,8 @@ public:
     GuideStats Stats() const;
     // Includes or excludes the selection, or every frame without one.
     void IncludeSelection(bool include);
+    // Includes or excludes every frame of the current session.
+    void IncludeAll(bool include);
 
     // The current session's view. While the vertical scale is locked, its
     // vertical scale is the locked one.

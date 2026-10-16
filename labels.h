@@ -56,6 +56,9 @@ struct SectionRow
 };
 SectionRow RowFor(const GuideLog& log, size_t section, Units units);
 
+// A section's heading over the chart: "Guiding · 07:06:47".
+std::string SectionTitle(const GuideLog& log, size_t section);
+
 // The day a log starts: "Sunday, October 4, 2026".
 std::string DayHeading(const wxDateTime& when);
 

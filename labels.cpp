@@ -84,11 +84,11 @@ std::string Distance(double pixels, double pixelScale, Units units, int decimals
     return Fixed(pixels, decimals) + " px";
 }
 
-static std::string ClockTime(const LogSection& section)
+static std::string ClockTime(const LogSection& section, const char *format = "%H:%M")
 {
     if (!section.starts.IsValid())
         return std::string(section.date.utf8_str());
-    return section.starts.Format("%H:%M").ToStdString();
+    return section.starts.Format(format).ToStdString();
 }
 
 SectionRow RowFor(const GuideLog& log, size_t section, Units units)
@@ -111,6 +111,15 @@ SectionRow RowFor(const GuideLog& log, size_t section, Units units)
         row.rms = Distance(hypot(s.rms_ra, s.rms_dec), s.pixelScale, units);
     }
     return row;
+}
+
+std::string SectionTitle(const GuideLog& log, size_t section)
+{
+    const LogSectionLoc& loc = log.sections[section];
+    if (loc.type == CALIBRATION_SECTION)
+        return "Calibration" + std::string(DOT) + ClockTime(log.calibrations[loc.idx], "%H:%M:%S");
+    const GuideSession& s = log.sessions[loc.idx];
+    return SessionLabel(s) + DOT + ClockTime(s, "%H:%M:%S");
 }
 
 std::string DayHeading(const wxDateTime& when)

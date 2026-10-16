@@ -115,6 +115,13 @@ TEST_CASE("A calibration row shows its start and steps", "[labels]")
     CHECK(row.rms.empty());
 }
 
+TEST_CASE("A section's title is its kind and start time", "[labels]")
+{
+    GuideLog log = RealLog();
+    CHECK(SectionTitle(log, 0) == "Calibration \u00b7 06:58:40");
+    CHECK(SectionTitle(log, 1) == "Guiding \u00b7 07:06:47");
+}
+
 TEST_CASE("The day heading names the day", "[labels]")
 {
     wxDateTime t;
