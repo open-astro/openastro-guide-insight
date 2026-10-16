@@ -16,6 +16,16 @@ add_executable(guideinsight_tests
   test_analysis.cpp
   test_build.cpp
   test_graphmath.cpp
+  test_ticks.cpp
+  test_viewport.cpp
+  test_sessiondetails.cpp
+  test_selection.cpp
+  test_document.cpp
+  test_labels.cpp
+  test_appsettings.cpp
+  test_timeline.cpp
+  test_scatter.cpp
+  test_periodogram.cpp
   test_exclusion.cpp
   test_settingsmigration.cpp
 )

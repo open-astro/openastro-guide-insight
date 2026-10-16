@@ -93,32 +93,6 @@ endif()
 find_package(GSL REQUIRED)
 
 #################################################################################
-# wxFormBuilder generated UI code
-
-option(HAVE_WXFB "Regenerate the UI code from phdlogview.fbp with wxFormBuilder" OFF)
-
-set(FBSRC
-  ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp
-  ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h
-)
-
-if(HAVE_WXFB)
-  find_program(WXFB NAMES wxformbuilder wxFormBuilder
-    PATHS "C:/Program Files/wxFormBuilder" "C:/Program Files (x86)/wxFormBuilder"
-          "/Applications/wxFormBuilder.app/Contents/MacOS"
-    REQUIRED)
-  add_custom_command(
-    OUTPUT ${FBSRC}
-    COMMAND ${WXFB} -g ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  )
-else()
-  configure_file(generated/LogViewFrameBase.cpp ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp COPYONLY)
-  configure_file(generated/LogViewFrameBase.h ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h COPYONLY)
-endif()
-
-#################################################################################
 # Application
 
 # Parser and analysis code, independent of the GUI so it can be unit tested.
@@ -129,6 +103,26 @@ add_library(guideinsight_core STATIC
   analysis.h
   graphmath.cpp
   graphmath.h
+  ticks.cpp
+  ticks.h
+  viewport.cpp
+  viewport.h
+  sessiondetails.cpp
+  sessiondetails.h
+  selection.cpp
+  selection.h
+  document.cpp
+  document.h
+  labels.cpp
+  labels.h
+  appsettings.cpp
+  appsettings.h
+  timeline.cpp
+  timeline.h
+  scatter.cpp
+  scatter.h
+  periodogram.cpp
+  periodogram.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
@@ -144,21 +138,57 @@ if(MSVC)
 endif()
 
 set(SRC
-  AnalysisWin.cpp
-  AnalysisWin.h
+  CalibrationCanvas.cpp
+  CalibrationCanvas.h
+  chartdraw.cpp
+  chartdraw.h
+  ChartHost.cpp
+  ChartHost.h
+  ChartView.cpp
+  ChartView.h
+  commands.h
+  DriftCanvas.cpp
+  DriftCanvas.h
+  FrequencyCanvas.cpp
+  FrequencyCanvas.h
+  icons.cpp
+  icons.h
+  Inspector.cpp
+  Inspector.h
   LogViewApp.cpp
   LogViewApp.h
-  LogViewFrame.cpp
-  LogViewFrame.h
+  MainFrame.cpp
+  MainFrame.h
+  OverviewScrubber.cpp
+  OverviewScrubber.h
+  SectionHeader.cpp
+  SectionHeader.h
+  Preferences.cpp
+  Preferences.h
+  ScatterCanvas.cpp
+  ScatterCanvas.h
+  SegmentedControl.cpp
+  SegmentedControl.h
+  SessionSidebar.cpp
+  SessionSidebar.h
+  theme.cpp
+  theme.h
+  TimelineCanvas.cpp
+  TimelineCanvas.h
 )
 
 if(WIN32)
   list(APPEND SRC openastro-guide-insight.rc)
 endif()
 
-add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC} ${FBSRC})
+add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC})
 
-target_include_directories(guideinsight PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+# The resource file embeds wxWidgets' manifest (DPI awareness, common
+# controls); stop MSVC's linker adding a second one.
+if(MSVC)
+  target_link_options(guideinsight PRIVATE /MANIFEST:NO)
+endif()
+
 target_link_libraries(guideinsight PRIVATE guideinsight_core)
 guideinsight_warnings(guideinsight)
 
