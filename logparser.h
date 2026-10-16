@@ -112,25 +112,6 @@ struct Mount
     Mount() : isValid(false), xRate(1.0), yRate(1.0), xAngle(0.0), yAngle(M_PI_2) { }
 };
 
-struct GraphInfo
-{
-    double hscale;        // pixels per entry
-    double vscale;
-    double max_ofs;
-    double max_snr;
-    int max_mass;
-    int xofs;             // view offset relative to 0th entry
-    int yofs;
-    int xmin;
-    int xmax;
-    int width;
-    double i0;
-    double i1;
-
-    GraphInfo() : width(0) { }
-    bool IsValid() const { return width != 0; }
-};
-
 struct LogSection
 {
     wxString date;
@@ -166,21 +147,8 @@ struct GuideSession : public LogSection
     double drift_dec;   // pixels per minute
     double paerr;       // polar alignment error, arc-minutes
 
-    GraphInfo m_ginfo;
-
     GuideSession(const wxString& dt) : LogSection(dt), duration(0.), pixelScale(1.), declination(0.), rms_ra(0.), rms_dec(0.), drift_ra(0.), drift_dec(0.) { }
     void CalcStats();
-};
-
-struct CalDisplay
-{
-    bool valid;
-    int xofs;
-    int yofs;
-    double scale;
-    double min_scale;
-    int firstWest, lastWest, firstNorth, lastNorth;
-    CalDisplay() : valid(false) { }
 };
 
 struct Calibration : public LogSection
@@ -189,7 +157,6 @@ struct Calibration : public LogSection
 
     WhichMount device;
     EntryVec entries;
-    CalDisplay display;
 
     Calibration(const wxString& dt) : LogSection(dt), device(MOUNT) { }
 };

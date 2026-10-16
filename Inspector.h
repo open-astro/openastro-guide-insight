@@ -69,6 +69,11 @@ class Inspector : public wxScrolledWindow
     SectionHeader *m_rawHeader;
     wxTextCtrl *m_raw;
 
+    Section m_analysis;
+    wxStaticText *m_scope;
+    wxCheckBox *m_driftCorrection, *m_rawRa;
+    wxButton *m_selectGa;
+
     Section m_display;
     SegmentedControl *m_units, *m_axes, *m_xaxis, *m_device;
     wxStaticText *m_deviceLabel;
@@ -99,6 +104,8 @@ public:
 
     std::function<void(const DisplayOptions&)> onDisplay;
     std::function<void(bool lock)> onLockVertical;
+    std::function<void(const AnalysisOptions&)> onAnalysis;
+    std::function<void()> onSelectGuidingAssistant;
     std::function<void(const ExclusionSettings&)> onExclusions;
     std::function<void(bool include)> onIncludeAll;
 

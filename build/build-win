@@ -88,7 +88,7 @@ ISCC="/c/Program Files (x86)/Inno Setup 5/ISCC.exe"
 
 CMAKE_W=$(cygpath -w "$CMAKE")
 
-V=$(awk '/define +APP_VERSION_STR +/{gsub(/"/,"");print $3}' < <(dos2unix --quiet --to-stdout LogViewFrame.cpp))
+V=$(awk '/define +APP_VERSION_STR +/{gsub(/"/,"");print $3}' < <(dos2unix --quiet --to-stdout MainFrame.cpp))
 
 INSTALLER=OpenAstroGuideInsight${installer_arch}-${V}-setup
 
@@ -106,7 +106,7 @@ mkdir -p "$build_dir"
 cd "$build_dir"
 
 cat >run_cmake.bat <<EOF
-"$CMAKE_W" -Wno-dev -A "$cmake_arch" "${vcpkg_args[@]}" -DHAVE_WXFB=0 ..
+"$CMAKE_W" -Wno-dev -A "$cmake_arch" "${vcpkg_args[@]}" ..
 EOF
 "$CMD" /c run_cmake.bat
 
