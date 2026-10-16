@@ -39,10 +39,20 @@ void ApplyExclusions(GuideSession& session, const ExclusionSettings& settings)
 
 double MaxOffset(const GuideSession& session)
 {
-    double mx = 0.;
+    // the frames that count, unless none do
+    double counted = 0., all = 0.;
+    bool any = false;
     for (const auto& e : session.entries)
-        mx = std::max({ mx, (double) fabs(e.raraw), (double) fabs(e.decraw) });
-    return mx;
+    {
+        double v = std::max(fabs(e.raraw), fabs(e.decraw));
+        all = std::max(all, v);
+        if (e.included && StarWasFound(e.err))
+        {
+            counted = std::max(counted, v);
+            any = true;
+        }
+    }
+    return any ? counted : all;
 }
 
 // The closest zoom: the same for a time axis as for a frame axis, taking
@@ -54,20 +64,6 @@ static double MaxScale(const GuideSession::EntryVec& entries, XAxis axis)
     if (axis == XAxis::Time && end > start)
         return MAX_PIXELS_PER_FRAME * (double) (entries.size() - 1) / (end - start);
     return MAX_PIXELS_PER_FRAME;
-}
-
-// The x-axis position of a fractional entry index.
-static double PositionAtIndex(const GuideSession::EntryVec& entries, double index, XAxis axis)
-{
-    if (axis == XAxis::Frames || entries.empty())
-        return index;
-    double last = (double) (entries.size() - 1);
-    index = std::clamp(index, 0., last);
-    size_t i = (size_t) floor(index);
-    if ((double) i >= last)
-        return entries.back().dt;
-    double frac = index - (double) i;
-    return entries[i].dt + frac * (entries[i + 1].dt - entries[i].dt);
 }
 
 static Viewport NewViewport(const GuideSession::EntryVec& entries, XAxis axis)
@@ -175,9 +171,18 @@ void Document::IncludeSelection(bool include)
     if (!s)
         return;
     if (m_selection)
-        IncludeFrames(*s, *m_selection, include);
+        ::IncludeFrames(*s, *m_selection, include);
     else
         IncludeRange(s->entries, include);
+    s->CalcStats();
+}
+
+void Document::IncludeFrames(const IndexRun& run, bool include)
+{
+    GuideSession *s = Session();
+    if (!s || run.first > run.last)
+        return;
+    ::IncludeFrames(*s, run, include);
     s->CalcStats();
 }
 
@@ -227,6 +232,7 @@ void Document::FitVertical(double height)
     if (!v)
         return;
     v->vertical.Fit(MaxOffset(*Session()), height);
+    v->verticalFitted = true;
     if (VerticalScaleLocked())
         m_lock = v->vertical.Scale() / Session()->pixelScale;
 }

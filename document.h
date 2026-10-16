@@ -49,7 +49,8 @@ struct ExclusionSettings
 // settings pick out.
 void ApplyExclusions(GuideSession& session, const ExclusionSettings& settings);
 
-// The largest RA or Dec offset in the session, in guide-camera pixels.
+// The largest RA or Dec offset among the frames that count toward the
+// statistics, or among all frames when none do, in guide-camera pixels.
 double MaxOffset(const GuideSession& session);
 
 // What one session's chart shows.
@@ -57,6 +58,7 @@ struct SessionView
 {
     Viewport horizontal{ 1. };
     VerticalView vertical;
+    bool verticalFitted = false; // fitted to the chart's height yet
 };
 
 class Document
@@ -103,6 +105,8 @@ public:
     GuideStats Stats() const;
     // Includes or excludes the selection, or every frame without one.
     void IncludeSelection(bool include);
+    // Includes or excludes a run of frames, leaving the selection alone.
+    void IncludeFrames(const IndexRun& run, bool include);
     // Includes or excludes every frame of the current session.
     void IncludeAll(bool include);
 

@@ -243,6 +243,15 @@ TEST_CASE("The time axis counts seconds", "[viewport]")
     CHECK(end == 14.);
 }
 
+TEST_CASE("Fractional frames have positions on either axis", "[viewport]")
+{
+    auto e = Entries({ 8.f, 10.f, 14.f });
+    CHECK(PositionAtIndex(e, 1.5, XAxis::Frames) == 1.5);
+    CHECK(PositionAtIndex(e, 1.5, XAxis::Time) == Approx(12.));
+    CHECK(PositionAtIndex(e, -0.5, XAxis::Time) == Approx(8.));
+    CHECK(PositionAtIndex(e, 5., XAxis::Time) == Approx(14.));
+}
+
 TEST_CASE("An empty session spans nothing", "[viewport]")
 {
     GuideSession::EntryVec e;

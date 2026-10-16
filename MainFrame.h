@@ -23,6 +23,7 @@
 // The app's window: the session sidebar, the chart and the inspector, with
 // a toolbar and menus.
 
+#include "ChartHost.h"
 #include "appsettings.h"
 #include "document.h"
 #include "theme.h"
@@ -39,7 +40,7 @@ class SessionSidebar;
 class wxPreferencesEditor;
 class wxSplitterWindow;
 
-class MainFrame : public wxFrame
+class MainFrame : public wxFrame, public ChartHost
 {
     Document m_doc;
     AppSettings m_settings;
@@ -82,8 +83,24 @@ class MainFrame : public wxFrame
     void OnHelp(wxCommandEvent& event);
     void OnAbout(wxCommandEvent& event);
     void OnSysColourChanged(wxSysColourChangedEvent& event);
+    void OnSelectAll(wxCommandEvent& event);
+    void OnIncludeSelection(wxCommandEvent& event);
+    void OnZoom(wxCommandEvent& event);
+    void SetDisplay(const DisplayOptions& options);
+    void LockVertical(bool lock);
+    void ChooseDevice();
+    void UpdateSubtitle();
 
 public:
+    // ChartHost
+    Document& Doc() override { return m_doc; }
+    const AppSettings& Settings() const override { return m_settings; }
+    const Palette& Colors() const override { return m_palette; }
+    void FramesChanged() override;
+    void SelectionChanged() override;
+    void ViewChanged() override;
+    void ShowStatus(const wxString& text) override;
+
     MainFrame();
     ~MainFrame();
 
