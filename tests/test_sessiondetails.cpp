@@ -21,6 +21,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <fstream>
+
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -164,4 +166,57 @@ TEST_CASE("An unknown pier side is left out", "[sessiondetails]")
 TEST_CASE("An empty header has no fields", "[sessiondetails]")
 {
     CHECK(SessionDetails(wxArrayString()).empty());
+}
+
+namespace {
+
+std::vector<std::string> CalFields(const Calibration& cal)
+{
+    std::vector<std::string> v;
+    for (const auto& f : CalibrationDetails(cal))
+        v.push_back(f.label + ": " + f.value);
+    return v;
+}
+
+} // namespace
+
+TEST_CASE("A calibration's results become labelled fields", "[sessiondetails]")
+{
+    std::ifstream ifs(TEST_DATA_DIR "/openastro_redcat51_2026-10-04.txt");
+    GuideLog log;
+    REQUIRE(LogParser().Parse(ifs, log));
+    REQUIRE(log.calibrations.size() == 1);
+    const Calibration& cal = log.calibrations[0];
+
+    int w = 0, e = 0, b = 0, n = 0, s = 0;
+    for (const auto& c : cal.entries)
+    {
+        w += c.direction == WEST;
+        e += c.direction == EAST;
+        b += c.direction == BACKLASH;
+        n += c.direction == NORTH;
+        s += c.direction == SOUTH;
+    }
+    std::string steps = "W " + std::to_string(w) + " \u00b7 E " + std::to_string(e) + " \u00b7 B " +
+        std::to_string(b) + " \u00b7 N " + std::to_string(n) + " \u00b7 S " + std::to_string(s);
+
+    CHECK(CalFields(cal) == std::vector<std::string>{
+        "RA rate: 0.822 px/s \u00b7 5.30\u2033/s",
+        "Dec rate: 1.045 px/s \u00b7 6.74\u2033/s",
+        "RA angle: \u2212114.5\u00b0",
+        "Dec angle: \u221223.6\u00b0",
+        "Orthogonality error: 0.9\u00b0",
+        "Step size: 750 ms, 25 px target",
+        "Steps: " + steps,
+    });
+}
+
+TEST_CASE("A calibration that did not finish shows only its steps", "[sessiondetails]")
+{
+    Calibration cal("2026-10-04 06:58:40");
+    cal.hdr.Add("Pixel scale = 2.00 arc-sec/px, Binning = 1, Focal length = 400 mm");
+    CalibrationEntry west{ WEST, 1, 0.f, 0.f };
+    CalibrationEntry backlash{ BACKLASH, 1, 0.f, 0.f };
+    cal.entries = { west, west, backlash };
+    CHECK(CalFields(cal) == std::vector<std::string>{ "Steps: W 2 \u00b7 B 1" });
 }
