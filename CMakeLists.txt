@@ -139,6 +139,8 @@ add_library(guideinsight_core STATIC
   settingsmigration.h
   assessment.cpp
   assessment.h
+  nights.cpp
+  nights.h
 )
 target_include_directories(guideinsight_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(guideinsight_core PUBLIC _USE_MATH_DEFINES HAVE_TYPE_TRAITS)

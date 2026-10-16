@@ -26,6 +26,7 @@
 #include "ChartHost.h"
 #include "appsettings.h"
 #include "document.h"
+#include "nights.h"
 #include "theme.h"
 
 #include <wx/filehistory.h>
@@ -47,6 +48,7 @@ class MainFrame : public wxFrame, public ChartHost
     Palette m_palette;
     wxString m_path;
     wxFileHistory m_history;
+    NightCache m_nights; // summaries of the logs beside the open one
     std::unique_ptr<wxPreferencesEditor> m_preferences;
 
     // the Drift and Frequency analysis, worked out when first asked for
