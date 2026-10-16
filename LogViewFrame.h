@@ -112,8 +112,9 @@ class SettingsDialog : public SettingsDialogBase
 public:
     wxColour m_raColor;
     wxColour m_decColor;
+    wxCheckBox *m_excludePauses;
 
-    SettingsDialog(wxWindow *parent) : SettingsDialogBase(parent) { }
+    SettingsDialog(wxWindow *parent);
     void OnRAColor(wxCommandEvent& event);
     void OnDecColor(wxCommandEvent& event);
 };
@@ -144,6 +145,7 @@ struct Settings
 {
     bool excludeByServer;
     bool excludeParametric;
+    bool excludeServerPauses;
     SettleParams settle;
     wxColor raColor;
     wxColor decColor;

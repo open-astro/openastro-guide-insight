@@ -238,6 +238,7 @@ LogViewFrame::LogViewFrame()
 
     s_settings.excludeByServer = Config->ReadBool("/settle/excludeByServer", true);
     s_settings.excludeParametric = Config->ReadBool("/settle/excludeParametric", false);
+    s_settings.excludeServerPauses = Config->ReadBool("/exclude/serverPauses", false);
     s_settings.settle.pixels = Config->ReadDouble("/settle/pixels", 1.0);
     s_settings.settle.seconds = Config->ReadDouble("/settle/seconds", 10.0);
     s_settings.raColor = wxColor(Config->Read("/color/ra", wxColor(100, 100, 255).GetAsString(wxC2S_HTML_SYNTAX)));
@@ -294,6 +295,9 @@ static void ExcludeSettling(GuideSession *session)
 
     if (s_settings.excludeParametric)
         ExcludeSettlingByDistance(*session, s_settings.settle);
+
+    if (s_settings.excludeServerPauses)
+        ExcludeServerPauses(*session);
 }
 
 void LogViewFrame::OpenLog(const wxString& filename)
@@ -435,6 +439,17 @@ static void OnColor(wxWindow *parent, wxButton *btn, wxColor *color)
     }
 }
 
+SettingsDialog::SettingsDialog(wxWindow *parent) : SettingsDialogBase(parent)
+{
+    // Added here rather than in phdlogview.fbp so the generated code stays
+    // untouched until it is regenerated (issue #4). Placed after "Dither".
+    auto box = new wxStaticBoxSizer(new wxStaticBox(this, wxID_ANY, "Server commands"), wxVERTICAL);
+    m_excludePauses = new wxCheckBox(box->GetStaticBox(), wxID_ANY, "Exclude frames between PAUSE and RESUME");
+    box->Add(m_excludePauses, 0, wxALL, 5);
+    GetSizer()->Insert(1, box, 0, wxEXPAND, 5);
+    GetSizer()->Fit(this);
+}
+
 void SettingsDialog::OnRAColor(wxCommandEvent& WXUNUSED(event))
 {
     OnColor(this, m_raColorBtn, &m_raColor);
@@ -451,6 +466,7 @@ void LogViewFrame::OnFileSettings(wxCommandEvent& WXUNUSED(event))
 
     dlg.m_excludeApi->SetValue(s_settings.excludeByServer);
     dlg.m_excludeByParam->SetValue(s_settings.excludeParametric);
+    dlg.m_excludePauses->SetValue(s_settings.excludeServerPauses);
     double pixels = s_settings.settle.pixels;
     dlg.m_settlePixels->SetValidator(wxFloatingPointValidator<double>(2, &pixels, 0));
     double seconds = s_settings.settle.seconds;
@@ -465,6 +481,7 @@ void LogViewFrame::OnFileSettings(wxCommandEvent& WXUNUSED(event))
 
     s_settings.excludeByServer = dlg.m_excludeApi->GetValue();
     s_settings.excludeParametric = dlg.m_excludeByParam->GetValue();
+    s_settings.excludeServerPauses = dlg.m_excludePauses->GetValue();
     s_settings.settle.pixels = pixels;
     s_settings.settle.seconds = seconds;
     s_settings.raColor = dlg.m_raColor;
@@ -477,6 +494,7 @@ void LogViewFrame::OnFileSettings(wxCommandEvent& WXUNUSED(event))
 
     Config->Write("/settle/excludeByServer", s_settings.excludeByServer);
     Config->Write("/settle/excludeParametric", s_settings.excludeParametric);
+    Config->Write("/exclude/serverPauses", s_settings.excludeServerPauses);
     Config->Write("/settle/pixels", s_settings.settle.pixels);
     Config->Write("/settle/seconds", s_settings.settle.seconds);
     Config->Write("/color/ra", s_settings.raColor.GetAsString(wxC2S_HTML_SYNTAX));

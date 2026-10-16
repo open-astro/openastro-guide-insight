@@ -42,4 +42,8 @@ void ExcludeSettlingByServer(GuideSession& session);
 // params.pixels for longer than params.seconds.
 void ExcludeSettlingByDistance(GuideSession& session, const SettleParams& params);
 
+// Excludes frames between the server's PAUSE and RESUME commands, logged as
+// "Server received PAUSE" / "Server received RESUME".
+void ExcludeServerPauses(GuideSession& session);
+
 #endif

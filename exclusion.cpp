@@ -107,3 +107,25 @@ void ExcludeSettlingByDistance(GuideSession& session, const SettleParams& params
         }
     }
 }
+
+void ExcludeServerPauses(GuideSession& session)
+{
+    bool paused = false;
+    int start_idx = 0;
+
+    for (const InfoEntry& info : session.infos)
+    {
+        if (!paused && info.info == "Server received PAUSE")
+        {
+            paused = true;
+            start_idx = info.idx;
+        }
+        else if (paused && info.info == "Server received RESUME")
+        {
+            paused = false;
+            IncludeRange(session.entries, false, start_idx, info.idx);
+        }
+    }
+    if (paused)
+        IncludeRange(session.entries, false, start_idx);
+}
