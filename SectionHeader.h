@@ -32,6 +32,8 @@
 
 class SectionHeader : public wxControl
 {
+    friend class SectionHeaderAccessible;
+
     wxString m_title;
     bool m_open = true;
     bool m_small;
