@@ -123,3 +123,42 @@ TEST_CASE("Include and exclude ranges of frames", "[exclusion]")
     IncludeRange(s.entries, false, 3);
     CHECK(Pattern(s) == "oooxx");
 }
+
+TEST_CASE("Frames while the server paused guiding are excluded", "[exclusion]")
+{
+    // Upstream issue #17: exclude the period between PAUSE and RESUME so
+    // the corrections that recover the star are left out of the statistics.
+    GuideSession s = Session(10);
+    AddInfo(s, 3, "Server received PAUSE");
+    AddInfo(s, 6, "Server received RESUME");
+    ExcludeServerPauses(s);
+    CHECK(Pattern(s) == "oooxxxoooo");
+}
+
+TEST_CASE("A pause with no resume is excluded to the end", "[exclusion]")
+{
+    GuideSession s = Session(6);
+    AddInfo(s, 4, "Server received PAUSE");
+    ExcludeServerPauses(s);
+    CHECK(Pattern(s) == "ooooxx");
+}
+
+TEST_CASE("Several pauses are each excluded", "[exclusion]")
+{
+    GuideSession s = Session(10);
+    AddInfo(s, 1, "Server received PAUSE");
+    AddInfo(s, 2, "Server received RESUME");
+    AddInfo(s, 6, "Server received PAUSE");
+    AddInfo(s, 8, "Server received RESUME");
+    ExcludeServerPauses(s);
+    CHECK(Pattern(s) == "oxooooxxoo");
+}
+
+TEST_CASE("Other server commands do not exclude frames", "[exclusion]")
+{
+    GuideSession s = Session(5);
+    AddInfo(s, 1, "Server received LOOP");
+    AddInfo(s, 2, "Server received RESUME");
+    ExcludeServerPauses(s);
+    CHECK(Pattern(s) == "ooooo");
+}
