@@ -27,6 +27,9 @@
 
 #include <stddef.h>
 #include <string>
+#include <vector>
+
+#include "graphmath.h"
 
 struct GuideSession;
 
@@ -64,9 +67,29 @@ struct GARun
                  bool drift_correction = true);
 };
 
+// Statistics over the included frames, where the star was found, of entries
+// [begin, end) of a session.
+struct GuideStats
+{
+    size_t frames = 0;  // frames counted
+    double rms_ra = 0., rms_dec = 0.;
+    double avg_ra = 0., avg_dec = 0.;
+    double theta = 0.;  // angle of the elongation ellipse's x-axis
+    double lx = 0., ly = 0.; // ellipse axes
+    double elongation = 0.;
+    double peak_ra = 0., peak_dec = 0.;
+    double drift_ra = 0., drift_dec = 0.; // pixels per minute
+    double paerr = 0.;  // polar alignment error, arc-minutes
+};
+GuideStats CalcStats(const GuideSession& session, size_t begin, size_t end);
+
 // The periodogram as CSV text: a header row, then period (s), amplitude (px)
 // and amplitude (arc-seconds) per row.
 std::string FftCsv(const GARun& ga);
+
+// The stretches of a session with guide output off, such as a Guiding
+// Assistant run, that have enough frames to analyse.
+std::vector<IndexRun> GuidingAssistantRuns(const GuideSession& session);
 
 // What kind of run a guiding section was, for the log's table of contents:
 // "Guiding", "Guiding Assistant", "Guiding + GA", "Unguided" or

@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <iterator>
 #include <math.h>
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_errno.h>
@@ -91,16 +92,18 @@ inline static bool Include(const GuideEntry& e)
     return e.included && StarWasFound(e.err);
 }
 
-static double DecDrift(const GuideSession::EntryVec& entries)
+typedef GuideSession::EntryVec::const_iterator EntryIter;
+
+static double DecDrift(EntryIter begin, EntryIter end)
 {
-    if (entries.size() < 2)
+    if (end - begin < 2)
         return 0.;
 
-    auto it = entries.begin();
-    for (; it != entries.end(); ++it)
+    auto it = begin;
+    for (; it != end; ++it)
         if (Include(*it))
             break;
-    if (it == entries.end())
+    if (it == end)
         return 0.;
 
     double y_accum = 0.;
@@ -112,7 +115,7 @@ static double DecDrift(const GuideSession::EntryVec& entries)
     fit.data(it->dt, y_accum);
     ++it;
 
-    for (; it != entries.end(); ++it)
+    for (; it != end; ++it)
     {
         if (!Include(*it))
             continue;
@@ -131,14 +134,14 @@ static double DecDrift(const GuideSession::EntryVec& entries)
     return fit.B();
 }
 
-static double RaDrift(const GuideSession::EntryVec& entries)
+static double RaDrift(EntryIter begin, EntryIter end)
 {
     // estimate RA drift = (RA offset + sum of RA corrections) / time
 
     bool found = false;
     double ra0 = 0., t0 = 0.;
-    auto it = entries.begin();
-    for (; it != entries.end(); ++it)
+    auto it = begin;
+    for (; it != end; ++it)
     {
         if (Include(*it))
         {
@@ -153,7 +156,7 @@ static double RaDrift(const GuideSession::EntryVec& entries)
         return 0.;
 
     double sum = 0.;
-    for (; it != entries.end(); ++it)
+    for (; it != end; ++it)
     {
         // dropped frames may have ra corrections
         if (it->included)
@@ -162,7 +165,7 @@ static double RaDrift(const GuideSession::EntryVec& entries)
 
     // the forward search found an included entry, so this search finds one too
     double ra1 = ra0, t1 = t0;
-    for (auto itr = entries.rbegin(); itr != entries.rend(); ++itr)
+    for (auto itr = std::make_reverse_iterator(end); itr != std::make_reverse_iterator(begin); ++itr)
     {
         if (Include(*itr))
         {
@@ -175,24 +178,33 @@ static double RaDrift(const GuideSession::EntryVec& entries)
     return t1 > t0 ? (ra1 - ra0 - sum) / (t1 - t0) : 0.;
 }
 
-static double PolarAlignError(const GuideSession& session)
+static double PolarAlignError(double drift_dec, const GuideSession& session)
 {
     // polar alignment error from Barrett:
     // http://celestialwonders.com/articles/polaralignment/PolarAlignmentAccuracy.pdf
-    return 3.8197 * fabs(session.drift_dec) * session.pixelScale / cos(session.declination);
+    return 3.8197 * fabs(drift_dec) * session.pixelScale / cos(session.declination);
 }
 
-void GuideSession::CalcStats()
+GuideStats CalcStats(const GuideSession& session, size_t begin, size_t end)
 {
+    GuideStats st;
+    end = std::min(end, session.entries.size());
+    if (begin >= end)
+        return st;
+
+    const EntryIter first = session.entries.begin() + begin;
+    const EntryIter last = session.entries.begin() + end;
+
     LFit fitrd;
     double peak_r = 0., peak_d = 0.;
 
-    for (auto it = entries.begin(); it != entries.end(); ++it)
+    for (auto it = first; it != last; ++it)
     {
         const GuideEntry& e = *it;
         if (!Include(e))
             continue;
 
+        st.frames++;
         fitrd.data(e.raraw, e.decraw);
 
         if (fabs(e.raraw) > fabs(peak_r))
@@ -201,51 +213,70 @@ void GuideSession::CalcStats()
             peak_d = e.decraw;
     }
 
-    rms_ra = sqrt(fitrd.varx);
-    rms_dec = sqrt(fitrd.vary);
-    avg_ra = fitrd.avx;
-    avg_dec = fitrd.avy;
-    peak_ra = peak_r;
-    peak_dec = peak_d;
+    st.rms_ra = sqrt(fitrd.varx);
+    st.rms_dec = sqrt(fitrd.vary);
+    st.avg_ra = fitrd.avx;
+    st.avg_dec = fitrd.avy;
+    st.peak_ra = peak_r;
+    st.peak_dec = peak_d;
 
     // angle of elongation
-    theta = fitrd.Theta();
+    st.theta = fitrd.Theta();
 
     // now get variances of the transformed coordinates offset by the
     // mean and rotated by theta
-    double cost = cos(theta), sint = sin(theta);
+    double cost = cos(st.theta), sint = sin(st.theta);
 
     LFit fitxy;
-    for (auto it = entries.begin(); it != entries.end(); ++it)
+    for (auto it = first; it != last; ++it)
     {
         const GuideEntry& e = *it;
         if (!Include(e))
             continue;
 
-        double dr = e.raraw - avg_ra;
-        double dd = e.decraw - avg_dec;
+        double dr = e.raraw - st.avg_ra;
+        double dd = e.decraw - st.avg_dec;
         double x = dr * cost + dd * sint;
         double y = dd * cost - dr * sint;
 
         fitxy.data(x, y);
     }
 
-    lx = sqrt(fitxy.varx);
-    ly = sqrt(fitxy.vary);
+    st.lx = sqrt(fitxy.varx);
+    st.ly = sqrt(fitxy.vary);
 
     {
-        double a = lx, b = ly;
+        double a = st.lx, b = st.ly;
         if (a < b)
             std::swap(a, b);
 
-        elongation = (a + b) > 1e-6 ?
+        st.elongation = (a + b) > 1e-6 ?
                 (a - b) / (a + b) :
                 1.;
     }
 
-    drift_ra = RaDrift(entries) * 60.;   // pixels per minute
-    drift_dec = DecDrift(entries) * 60.;
-    paerr = PolarAlignError(*this);
+    st.drift_ra = RaDrift(first, last) * 60.;   // pixels per minute
+    st.drift_dec = DecDrift(first, last) * 60.;
+    st.paerr = PolarAlignError(st.drift_dec, session);
+    return st;
+}
+
+void GuideSession::CalcStats()
+{
+    GuideStats st = ::CalcStats(*this, 0, entries.size());
+    rms_ra = st.rms_ra;
+    rms_dec = st.rms_dec;
+    avg_ra = st.avg_ra;
+    avg_dec = st.avg_dec;
+    theta = st.theta;
+    lx = st.lx;
+    ly = st.ly;
+    elongation = st.elongation;
+    peak_ra = st.peak_ra;
+    peak_dec = st.peak_dec;
+    drift_ra = st.drift_ra;
+    drift_dec = st.drift_dec;
+    paerr = st.paerr;
 }
 
 GARun::~GARun()
@@ -440,6 +471,28 @@ std::string FftCsv(const GARun& ga)
         out += '\n';
     }
     return out;
+}
+
+std::vector<IndexRun> GuidingAssistantRuns(const GuideSession& session)
+{
+    std::vector<IndexRun> runs;
+    const auto& entries = session.entries;
+    size_t i = 0;
+    while (i < entries.size())
+    {
+        if (entries[i].guiding)
+        {
+            i++;
+            continue;
+        }
+        size_t end = i;
+        while (end < entries.size() && !entries[end].guiding)
+            end++;
+        if (GARun::CanAnalyze(session, i, end))
+            runs.push_back(IndexRun{ (unsigned int) i, (unsigned int) end - 1 });
+        i = end;
+    }
+    return runs;
 }
 
 std::string SessionLabel(const GuideSession& session)

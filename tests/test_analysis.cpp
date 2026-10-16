@@ -314,3 +314,19 @@ TEST_CASE("Drift correction can be turned off", "[analysis]")
     CHECK_THAT(raw.rac[raw.len - 1] - raw.rac[0], WithinAbs(48., 0.5));
     CHECK(raw.decc[0] == s.entries[0].decraw);
 }
+
+TEST_CASE("Stretches with guide output off can be analysed on their own", "[analysis]")
+{
+    // 4 guided, 14 unguided, 3 guided, 5 unguided (too few to analyse)
+    GuideSession s = Labelled("gggg" "uuuuuuuuuuuuuu" "ggg" "uuuuu");
+    auto runs = GuidingAssistantRuns(s);
+    REQUIRE(runs.size() == 1);
+    CHECK(runs[0].first == 4);
+    CHECK(runs[0].last == 17);
+}
+
+TEST_CASE("Ordinary guiding has no Guiding Assistant runs", "[analysis]")
+{
+    CHECK(GuidingAssistantRuns(Labelled("gggggggggggggggg")).empty());
+    CHECK(GuidingAssistantRuns(LoadRealLog().sessions[1]).empty());
+}

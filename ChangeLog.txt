@@ -1,3 +1,23 @@
+Unreleased - OpenAstro Guide Insight
+        * Renamed from PHD2 Log Viewer; settings carry over
+        * New window: a sidebar of sessions, the chart, and an inspector of
+          statistics, session details, display, analysis and exclusion options
+        * The chart switches between Timeline, Scatter, Drift and Frequency;
+          the separate analysis window is gone
+        * Timeline: drag to select frames and see their statistics; scroll,
+          pinch and an overview strip to move around; a time axis option;
+          hover for any frame's details
+        * Scatter: full size, with labelled scale rings
+        * Drift: drift correction can be turned off
+        * Frequency: pointing snaps to the nearest peak; export as CSV from
+          the File menu
+        * Light and dark appearance, standard menus and shortcuts, Open
+          Recent, Preferences, and a rewritten Help
+        * Exclusion settings now apply to every session when changed
+        * Fixed: RA plotted against its grid labels' sign, guide limits that
+          ignored the AO, a failed open clearing the current log, file names
+          with apostrophes not opening in the text editor
+
 Version 0.6.5 - 24 May 2026
         * compute elongation statistic and display ellipse in scatter plot
         * exclude star-lost frames from scatter plot and stats

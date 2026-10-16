@@ -2,6 +2,7 @@
  * This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  * Copyright (C) 2016 Andy Galasso
+ * Copyright (C) 2026 Open Astro contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,42 +22,26 @@
 #define LOGVIEWAPP_INCLUDED
 
 #include <wx/app.h>
-#include <wx/config.h>
-#include <wx/font.h>
-#include <wx/gdicmn.h>
 
-class LogViewFrame;
-
-extern wxConfigBase *Config;
+class MainFrame;
 
 class LogViewApp : public wxApp
 {
-    LogViewFrame *m_frame;
+    MainFrame *m_frame = nullptr;
     wxString m_openFile;
 
 public:
     LogViewApp();
-    LogViewFrame *LVFrame() const { return m_frame; }
 
 private:
-    bool OnInit();
-    int OnExit();
-    void OnInitCmdLine(wxCmdLineParser& parser);
-    bool OnCmdLineParsed(wxCmdLineParser& parser);
+    bool OnInit() override;
+    void OnInitCmdLine(wxCmdLineParser& parser) override;
+    bool OnCmdLineParsed(wxCmdLineParser& parser) override;
+#ifdef __WXOSX__
+    void MacOpenFiles(const wxArrayString& files) override;
+#endif
 };
 
 wxDECLARE_APP(LogViewApp);
-
-// Font for text drawn on graphs: axis labels, event markers, legends.
-inline wxFont GraphLabelFont()
-{
-#if defined(__WXOSX__)
-    // macOS's small system font is already compact; making it smaller again
-    // left the labels unreadable (upstream issue #18).
-    return *wxSMALL_FONT;
-#else
-    return wxSWISS_FONT->Smaller();
-#endif
-}
 
 #endif

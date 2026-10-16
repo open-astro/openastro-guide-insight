@@ -2,6 +2,7 @@
  * This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  * Copyright (C) 2016 Andy Galasso
+ * Copyright (C) 2026 Open Astro contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,13 +19,13 @@
  */
 
 #include "LogViewApp.h"
-#include "LogViewFrame.h"
+#include "MainFrame.h"
 #include "settingsmigration.h"
 
 #include <gsl/gsl_errno.h>
 #include <wx/cmdline.h>
-
-wxConfigBase *Config = 0;
+#include <wx/config.h>
+#include <wx/log.h>
 
 static void gsl_error_handler(const char *WXUNUSED(reason), const char *WXUNUSED(file), int WXUNUSED(line), int WXUNUSED(gsl_errno))
 {
@@ -34,17 +35,14 @@ static void gsl_error_handler(const char *WXUNUSED(reason), const char *WXUNUSED
 }
 
 LogViewApp::LogViewApp()
-    :
-    m_frame(0)
 {
     SetVendorName("OpenAstro");
     SetAppName("guide-insight");
     SetAppDisplayName("OpenAstro Guide Insight");
-    Config = wxConfig::Get();
 
     // Carry over settings saved before the app was renamed from PHD2 Log Viewer.
     wxConfig previous("phdlogview", "adgsoftware");
-    MigrateSettings(previous, *Config);
+    MigrateSettings(previous, *wxConfig::Get());
 }
 
 bool LogViewApp::OnInit()
@@ -53,21 +51,15 @@ bool LogViewApp::OnInit()
         return false;
 
     wxLog::SetActiveTarget(new wxLogStderr());
+    gsl_set_error_handler(&gsl_error_handler);
 
-    m_frame = new LogViewFrame();
+    m_frame = new MainFrame();
     m_frame->Show();
 
     if (!m_openFile.IsEmpty())
-        m_frame->OpenLog(m_openFile);
-
-    gsl_set_error_handler(&gsl_error_handler);
+        m_frame->Open(m_openFile);
 
     return true;
-}
-
-int LogViewApp::OnExit()
-{
-    return wxApp::OnExit();
 }
 
 void LogViewApp::OnInitCmdLine(wxCmdLineParser& parser)
@@ -83,5 +75,18 @@ bool LogViewApp::OnCmdLineParsed(wxCmdLineParser& parser)
         m_openFile = parser.GetParam(0);
     return true;
 }
+
+#ifdef __WXOSX__
+// Files opened from the Finder, or dropped on the Dock icon.
+void LogViewApp::MacOpenFiles(const wxArrayString& files)
+{
+    if (files.empty())
+        return;
+    if (m_frame)
+        m_frame->Open(files[0]);
+    else
+        m_openFile = files[0];
+}
+#endif
 
 wxIMPLEMENT_APP(LogViewApp);
