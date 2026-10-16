@@ -210,6 +210,15 @@ LogViewFrame::LogViewFrame()
     m_timer(this, ID_TIMER),
     m_analysisWin(nullptr)
 {
+    // The row with "Plot options" and the statistics box was added without
+    // wxEXPAND, so it never grew past its initial width and the statistics
+    // were clipped. Let the row span the window: plot options take the spare
+    // width and the statistics box takes what its content needs.
+    if (wxSizerItem *row = m_mainSizer->GetItem(m_guideControlsSizer))
+        row->SetFlag(row->GetFlag() | wxEXPAND);
+    if (m_guideControlsSizer->GetItemCount() >= 2)
+        m_guideControlsSizer->GetItem((size_t) 1)->SetProportion(0);
+
     SetTitle(APP_NAME);
 
     m_graph->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -561,6 +570,23 @@ std::string FormatNum(double n)
     return buf;
 }
 
+// After a control's content changes size, let it and every window above it
+// take the new size, so the content is never clipped.
+static void FitToContent(wxWindow *w)
+{
+    w->InvalidateBestSize();
+    w->SetMinSize(w->GetBestSize());
+    for (wxWindow *p = w->GetParent(); p; p = p->GetParent())
+    {
+        p->InvalidateBestSize();
+        if (p->IsTopLevel())
+        {
+            p->Layout();
+            break;
+        }
+    }
+}
+
 static void InitStats(wxGrid *stats, wxHtmlWindow *stats2, const GuideSession *session)
 {
     stats->BeginBatch();
@@ -573,6 +599,7 @@ static void InitStats(wxGrid *stats, wxHtmlWindow *stats2, const GuideSession *s
     stats->SetCellValue(2, 1, wxString::Format(" Elong.: %.f%%", session->elongation * 100.));
     stats->AutoSize();
     stats->EndBatch();
+    FitToContent(stats);
 
     std::ostringstream os;
     os << "<span style='font-family:monospace;font-size:8;'><table cellspacing=1 cellpadding=1 border=0>"
