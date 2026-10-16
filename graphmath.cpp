@@ -19,6 +19,8 @@
 
 #include "graphmath.h"
 
+#include <algorithm>
+
 std::vector<IndexRun> FoundRuns(const GuideSession::EntryVec& entries, unsigned int i0, unsigned int i1)
 {
     std::vector<IndexRun> runs;
@@ -39,4 +41,21 @@ std::vector<IndexRun> FoundRuns(const GuideSession::EntryVec& entries, unsigned 
     }
 
     return runs;
+}
+
+double IndexAtTime(const GuideSession::EntryVec& entries, double t)
+{
+    if (entries.size() < 2 || t <= entries.front().dt)
+        return 0.;
+    if (t >= entries.back().dt)
+        return (double)(entries.size() - 1);
+
+    // first entry later than t; the one before it is at or before t
+    auto hi = std::upper_bound(entries.begin(), entries.end(), t,
+                               [](double v, const GuideEntry& e) { return v < e.dt; });
+    auto lo = hi - 1;
+
+    double span = hi->dt - lo->dt;
+    double frac = span > 0. ? (t - lo->dt) / span : 0.;
+    return (double)(lo - entries.begin()) + frac;
 }
