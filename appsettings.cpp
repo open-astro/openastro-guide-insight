@@ -127,6 +127,9 @@ AppSettings LoadSettings(const wxConfigBase& c)
     d.mass = c.ReadBool("/display/mass", d.mass);
     d.snr = c.ReadBool("/display/snr", d.snr);
 
+    s.analysis.driftCorrection = c.ReadBool("/analysis/driftCorrection", s.analysis.driftCorrection);
+    s.analysis.rawRa = c.ReadBool("/analysis/rawRa", s.analysis.rawRa);
+
     s.view = VIEWS.Read(c, "/view", s.view);
     s.sidebarShown = c.ReadBool("/layout/sidebar", s.sidebarShown);
     s.inspectorShown = c.ReadBool("/layout/inspector", s.inspectorShown);
@@ -163,6 +166,9 @@ void SaveSettings(wxConfigBase& c, const AppSettings& s)
     c.Write("/display/limits", d.limits);
     c.Write("/display/mass", d.mass);
     c.Write("/display/snr", d.snr);
+
+    c.Write("/analysis/driftCorrection", s.analysis.driftCorrection);
+    c.Write("/analysis/rawRa", s.analysis.rawRa);
 
     VIEWS.Write(c, "/view", s.view);
     c.Write("/layout/sidebar", s.sidebarShown);
