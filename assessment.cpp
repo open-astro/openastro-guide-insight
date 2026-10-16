@@ -218,7 +218,9 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
 
     std::vector<double> snr;
     std::vector<std::pair<double, double>> ra, dec;
+    std::vector<double> mass, snrs; // in frame order
     size_t raPulses = 0, decPulses = 0;
+    int lastDec = 0; // the direction of the last Dec pulse
     for (size_t i = begin; i < end; i++)
     {
         const GuideEntry& e = entries[i];
@@ -228,6 +230,10 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
             continue;
         m.frames++;
         snr.push_back(e.snr);
+        mass.push_back(e.mass);
+        snrs.push_back(e.snr);
+        if (e.err == 1)
+            m.saturated++;
         if (i + 1 < end && Counted(entries[i + 1]))
         {
             ra.emplace_back(e.raraw, entries[i + 1].raraw);
@@ -241,11 +247,40 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         {
             decPulses++;
             (e.decdur > 0 ? m.north : m.south)++;
+            int dir = e.decdur > 0 ? 1 : -1;
+            if (lastDec && dir != lastDec)
+            {
+                m.decReversals++;
+                auto side = [](double v) { return (v > 0.) - (v < 0.); };
+                if (i + 2 < end && Counted(entries[i + 1]) && Counted(entries[i + 2]) &&
+                    side(entries[i + 1].decraw) == side(e.decraw) && side(entries[i + 2].decraw) == side(e.decraw))
+                    m.decStuck++;
+            }
+            lastDec = dir;
         }
         const Mount& mount = session.mount;
         if ((mount.xlim.maxDur > 0. && abs(e.radur) >= mount.xlim.maxDur) ||
             (mount.ylim.maxDur > 0. && abs(e.decdur) >= mount.ylim.maxDur))
             m.maxedPulses++;
+    }
+    auto median = [](std::vector<double> v) {
+        std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
+        return v[v.size() / 2];
+    };
+    if (mass.size() >= 40)
+    {
+        size_t q = mass.size() / 4;
+        m.firstMass = median(std::vector<double>(mass.begin(), mass.begin() + q));
+        m.lastMass = median(std::vector<double>(mass.end() - q, mass.end()));
+        m.firstSnr = median(std::vector<double>(snrs.begin(), snrs.begin() + q));
+        m.lastSnr = median(std::vector<double>(snrs.end() - q, snrs.end()));
+    }
+    if (end > begin + 10)
+    {
+        std::vector<double> gaps;
+        for (size_t i = begin + 1; i < end; i++)
+            gaps.push_back(entries[i].dt - entries[i - 1].dt);
+        m.cadence = median(gaps);
     }
     m.raLag1 = Correlation(ra);
     m.decLag1 = Correlation(dec);
@@ -264,6 +299,8 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         std::string line = Line(wxln);
         if (StartsWith(line, "Exposure = "))
             m.exposure = Positive(line.substr(11)).value_or(0.) / 1000.;
+        else if (StartsWith(line, "Dither = "))
+            m.timeLapse = Leading(Setting(line, "Guide-frame time lapse")).value_or(0.) / 1000.;
         else if (StartsWith(line, "X guide algorithm = "))
             m.raAggression = Positive(Setting(line, "Aggression")).value_or(0.);
         else if (StartsWith(line, "Lock position = "))
@@ -437,6 +474,9 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
     auto improve = [&a](Finding f) { a.improve.push_back(std::move(f)); };
     auto good = [&a](const std::string& title, const std::string& body) { a.good.push_back(Note(title, body)); };
     const std::string corr = "Frame-to-frame correlation " + Fixed(m.raLag1, 2);
+    const bool backlash = m.decReversals >= 10 && m.decStuck >= 0.5 * m.decReversals;
+    const double overhead = m.cadence - m.exposure - m.timeLapse;
+    const bool slowLoop = m.exposure > 0. && m.cadence > 0. && overhead > 1. && overhead > m.exposure;
     const std::string raPulses = "RA pulses on " + Percent(m.raPulsed) + " of frames";
 
     // RA: does it overshoot, lag, or chase noise?
@@ -462,6 +502,14 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
         improve(f);
     }
 
+    if (slowLoop)
+        improve(Note("Frames arrive every " + Fixed(m.cadence, 1) + " s",
+                     "Each exposure is " + Fixed(m.exposure, 1) + " s, but a new frame arrives only every " +
+                     Fixed(m.cadence, 1) + " s: about " + Fixed(overhead, 1) + " s of each cycle goes into getting "
+                     "the image to the guider. Corrections act on where the star was a few seconds before. Guide on a "
+                     "smaller area of the camera (a subframe), bin the guide camera, or use a faster connection to it.",
+                     "Median time between frames " + Fixed(m.cadence, 2) + " s"));
+
     if (m.frames > 0 && m.lost > 0.02 * (m.frames + m.lost))
         improve(Note("Star lost on " + std::to_string(m.lost) + " frames",
                          "The guide star wasn't found on " + std::to_string(m.lost) + " of " +
@@ -474,6 +522,20 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
         improve(Note("Faint guide star",
                          "At SNR " + Fixed(m.medianSnr, 0) + " the star's position is hard to measure, so guiding "
                          "reacts to measurement noise. Pick a brighter star or lengthen the exposure."));
+
+    if (m.frames > 0 && m.saturated > 0.05 * m.frames)
+        improve(Note("Guide star saturated",
+                     "The star was saturated on " + std::to_string(m.saturated) + " of " + std::to_string(m.frames) +
+                     " frames, so its centre can't be measured precisely. Pick a fainter star or shorten the exposure."));
+    if (m.firstMass > 0. && m.lastMass < 0.6 * m.firstMass)
+    {
+        std::string snrs = m.firstSnr > 0. ? " (SNR " + Fixed(m.firstSnr, 0) + " \u2192 " + Fixed(m.lastSnr, 0) + ")" :
+                                              std::string();
+        improve(Note("Guide star faded",
+                     "By the end, the star was " + Percent(m.lastMass / m.firstMass) + " as bright as at the start" +
+                     snrs + ". Dew on the guide scope, haze, or the star sinking lower in the sky can do this. Check "
+                     "for dew, or pick a star higher in the sky."));
+    }
 
     const double maxDur = session.mount.xlim.maxDur;
     if (maxDur > 0. && m.frames > 0)
@@ -515,10 +577,15 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
     if (span >= 300. && stats.paerr > 0.)
     {
         std::string drift = Fixed(stats.drift_dec * scale, 2) + ARCSEC + "/min";
-        if (stats.paerr > 10.)
+        // PHD2's Guiding Assistant: over 5' could be improved, over 10' use
+        // drift alignment; with likely Dec backlash, only over 10'
+        if (stats.paerr > (backlash ? 10. : 5.))
             improve(Note("Polar alignment is " + Fixed(stats.paerr, 0) + ARCMIN + " off",
-                             "Dec drifts " + drift + ". Guiding corrects it, but better polar alignment leaves Dec "
-                             "less to do and avoids field rotation."));
+                         "Dec drifts " + drift + ". Guiding corrects it, but better polar alignment leaves Dec less "
+                         "to do and avoids field rotation. " +
+                         (stats.paerr > 10. ? std::string("Use the drift-align tool, or your polar alignment routine, "
+                                                          "to improve it.") :
+                                              std::string("It could be improved."))));
         else
             good("Polar alignment " + Fixed(stats.paerr, 1) + ARCMIN, "Dec drift is " + drift + ".");
     }
@@ -535,8 +602,10 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
             body += " That adds about " + Arcsec(cost) + " to RA.";
         }
         body += " Longer exposures average the seeing out, leaving less to chase.";
+        if (slowLoop)
+            body += " With frames this slow, a longer exposure barely slows guiding.";
         Finding f = Note("RA is correcting noise", body, corr + " \u00b7 " + raPulses);
-        f.changes.push_back(Change{ "Exposure", Fixed(m.exposure, 1) + " s", "2\u20133 s" });
+        f.changes.push_back(Change{ "Exposure", Fixed(m.exposure, 1) + " s", "2\u20134 s" });
         if (m.raMinMove > 0. && m.raMinMove < 0.2)
             f.changes.push_back(Change{ "RA minimum move", Fixed(m.raMinMove, 2) + " px",
                                         Fixed(std::max(0.2, UpToTwentieth(m.raMinMove * 1.5)), 2) + " px" });
@@ -558,6 +627,15 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                                         Fixed(std::max(0.2, UpToTwentieth(m.decMinMove * 1.5)), 2) + " px" });
         improve(f);
     }
+
+    if (backlash)
+        improve(Note("Dec may have backlash",
+                     "After Dec changed direction, the error stayed on the same side for two more frames " +
+                     std::to_string(m.decStuck) + " times out of " + std::to_string(m.decReversals) +
+                     "; random motion would do that about 1 time in 4. That's what slack in the Dec gears looks "
+                     "like. The Guiding Assistant's backlash test measures it. If Dec drifts steadily one way, "
+                     "guide Dec in that direction only; otherwise try backlash compensation.",
+                     std::to_string(m.decStuck) + " of " + std::to_string(m.decReversals) + " Dec reversals"));
 
     if (m.dithers > 0)
     {

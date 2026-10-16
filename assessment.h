@@ -71,6 +71,15 @@ struct Measurements
     double decPulsed = 0.;
     size_t north = 0, south = 0; // Dec pulses each way
     size_t maxedPulses = 0;     // pulses at the longest duration allowed
+    size_t saturated = 0;       // frames where the star was saturated
+    // Dec pulses that went the other way from the one before, and how many
+    // of those left the error's sign unchanged for the next two frames
+    size_t decReversals = 0, decStuck = 0;
+    double cadence = 0.;        // median seconds from one frame to the next
+    double timeLapse = 0.;      // seconds of delay the user asked for between frames
+    // median star mass and SNR over the first and last quarter of the frames;
+    // 0 when there are too few frames
+    double firstMass = 0., lastMass = 0., firstSnr = 0., lastSnr = 0.;
     double raAggression = 0.;   // from the header; 0 when not logged
     double raMinMove = 0., decMinMove = 0.; // px
     double exposure = 0.;       // seconds
