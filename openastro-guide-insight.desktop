@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.1
+Name=OpenAstro Guide Insight
+GenericName=PHD2 Guide Log Analyzer
+Comment=See and analyze PHD2 guide logs
+Icon=openastro-guide-insight
+Exec=openastro-guide-insight %f
+Terminal=false
+MimeType=text/plain
+Categories=Education;Science;Astronomy;

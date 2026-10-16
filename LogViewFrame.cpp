@@ -1,5 +1,5 @@
 /*
- * This file is part of phdlogview
+ * This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  * Copyright (C) 2016-2020 Andy Galasso
  *
@@ -56,7 +56,7 @@
 #define DECEL 0.03
 #define MIN_SHOW 25
 
-#define APP_NAME "PHD2 Log Viewer"
+#define APP_NAME "OpenAstro Guide Insight"
 #define APP_VERSION_STR "0.6.5"
 
 PointArray s_tmp;
@@ -344,7 +344,7 @@ void LogViewFrame::OpenLog(const wxString& filename)
     {
         wxMessageBox(wxString::Format(
                          "%s is a PHD2 debug log.\n\n"
-                         "PHD2 Log Viewer reads guide logs. Open the file named "
+                         APP_NAME " reads guide logs. Open the file named "
                          "PHD2_GuideLog_<date>.txt from the same folder instead.",
                          fn.GetFullName()),
                      "Not a guide log", wxOK | wxICON_INFORMATION, this);
@@ -657,10 +657,13 @@ void LogViewFrame::OnHelpAbout(wxCommandEvent& WXUNUSED(event))
 
     aboutInfo.SetName(APP_NAME);
     aboutInfo.SetVersion(APP_VERSION_STR);
-    aboutInfo.SetDescription(_("A tool for visualizing PHD2 guide log data"));
-    aboutInfo.SetCopyright("(C) 2018-2020 Andy Galasso <andy.galasso@gmail.com>");
-    aboutInfo.SetWebSite("http://adgsoftware.com/phd2utils");
+    aboutInfo.SetDescription(_("See and analyze your PHD2 guide logs.\n"
+                               "Based on PHD2 Log Viewer by Andy Galasso."));
+    aboutInfo.SetCopyright("(C) 2016-2020 Andy Galasso\n(C) 2026 OpenAstro contributors");
+    aboutInfo.SetWebSite("https://github.com/open-astro/openastro-guide-insight");
+    aboutInfo.SetLicence(_("GNU General Public License, version 3 or later"));
     aboutInfo.AddDeveloper("Andy Galasso");
+    aboutInfo.AddDeveloper("OpenAstro contributors");
 
     wxAboutBox(aboutInfo);
 }

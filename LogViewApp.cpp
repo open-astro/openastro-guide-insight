@@ -1,5 +1,5 @@
 /*
- * This file is part of phdlogview
+ * This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  * Copyright (C) 2016 Andy Galasso
  *
@@ -19,6 +19,7 @@
 
 #include "LogViewApp.h"
 #include "LogViewFrame.h"
+#include "settingsmigration.h"
 
 #include <gsl/gsl_errno.h>
 #include <wx/cmdline.h>
@@ -36,9 +37,14 @@ LogViewApp::LogViewApp()
     :
     m_frame(0)
 {
-    SetVendorName("adgsoftware");
-    SetAppName("phdlogview");
+    SetVendorName("OpenAstro");
+    SetAppName("guide-insight");
+    SetAppDisplayName("OpenAstro Guide Insight");
     Config = wxConfig::Get();
+
+    // Carry over settings saved before the app was renamed from PHD2 Log Viewer.
+    wxConfig previous("phdlogview", "adgsoftware");
+    MigrateSettings(previous, *Config);
 }
 
 bool LogViewApp::OnInit()

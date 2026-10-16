@@ -90,7 +90,7 @@ CMAKE_W=$(cygpath -w "$CMAKE")
 
 V=$(awk '/define +APP_VERSION_STR +/{gsub(/"/,"");print $3}' < <(dos2unix --quiet --to-stdout LogViewFrame.cpp))
 
-INSTALLER=phdlogview${installer_arch}-${V}-installer
+INSTALLER=OpenAstroGuideInsight${installer_arch}-${V}-setup
 
 if [[ ! $VCPKG_ROOT ]]; then
     echo "VCPKG_ROOT must point at a vcpkg checkout" >&2
@@ -111,10 +111,10 @@ EOF
 "$CMD" /c run_cmake.bat
 
 # generate phd2.iss and README.txt in tmp, one level up from Release/
-sed -e "s/@VERSION@/$V/g" ../phdlogview-${arch}.iss.in >phdlogview.iss
+sed -e "s/@VERSION@/$V/g" ../openastro-guide-insight-${arch}.iss.in >openastro-guide-insight.iss
 
 "$CMAKE" --build . --config Release
 
 "$CTEST" --build-config Release
 
-"$ISCC" phdlogview.iss /F"${INSTALLER}"
+"$ISCC" openastro-guide-insight.iss /F"${INSTALLER}"
