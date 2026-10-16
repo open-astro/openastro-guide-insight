@@ -122,6 +122,13 @@ TEST_CASE("A section's title is its kind and start time", "[labels]")
     CHECK(SectionTitle(log, 1) == "Guiding \u00b7 07:06:47");
 }
 
+TEST_CASE("Combined sessions are titled by count and time span", "[labels]")
+{
+    GuideLog log = RealLog();
+    // the second session starts at 07:12:08 and runs 27 min 42 s
+    CHECK(CombinedTitle(log, { 1, 2 }) == "2 sessions \u00b7 07:06 \u2013 07:39");
+}
+
 TEST_CASE("The day heading names the day", "[labels]")
 {
     wxDateTime t;

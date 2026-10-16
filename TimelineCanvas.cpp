@@ -28,6 +28,7 @@
 #include <wx/menu.h>
 
 #include <algorithm>
+#include <cmath>
 #include <math.h>
 #include <memory>
 
@@ -275,6 +276,30 @@ void TimelineCanvas::Paint(wxGraphicsContext& gc, const wxRect& plot)
         drawSeries(pal.ra, lineWidth, [&](unsigned int i) { return yAt(SeriesValue(entries[i], Series::Ra, opt.raDecAxes)); });
     if (opt.dec)
         drawSeries(pal.dec, lineWidth, [&](unsigned int i) { return yAt(SeriesValue(entries[i], Series::Dec, opt.raDecAxes)); });
+
+    // total RMS over a trailing window, as a thicker line above zero
+    if (opt.runningRms)
+    {
+        std::vector<double> rms = RunningRms(entries, opt.rmsWindow);
+        gc.SetPen(gc.CreatePen(wxGraphicsPenInfo(pal.rms, lineWidth * 1.5).Join(wxJOIN_ROUND)));
+        wxGraphicsPath path = gc.CreatePath();
+        bool drawing = false;
+        for (unsigned int i = frames->first; i <= frames->last; i++)
+        {
+            if (std::isnan(rms[i]))
+            {
+                drawing = false;
+                continue;
+            }
+            double x = XAtIndex(i), y = yAt(rms[i]);
+            if (drawing)
+                path.AddLineToPoint(x, y);
+            else
+                path.MoveToPoint(x, y);
+            drawing = true;
+        }
+        gc.StrokePath(path);
+    }
 
     if (opt.events)
         PaintEvents(gc, plot, *frames);

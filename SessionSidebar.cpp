@@ -129,7 +129,7 @@ SessionSidebar::SessionSidebar(wxWindow *parent)
     sizer->Add(m_version, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(12));
 
     m_list = new wxDataViewListCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                    wxDV_SINGLE | wxDV_NO_HEADER | wxBORDER_NONE);
+                                    wxDV_MULTIPLE | wxDV_NO_HEADER | wxBORDER_NONE);
     m_list->SetName("Sessions");
     auto column = new wxDataViewColumn("Section", new SectionRenderer(this), 0, FromDIP(160),
                                        wxALIGN_LEFT, 0);
@@ -153,7 +153,7 @@ void SessionSidebar::FitColumn()
         m_list->GetColumn(0)->SetWidth(std::max(m_list->GetClientSize().x - FromDIP(2), FromDIP(80)));
 }
 
-void SessionSidebar::SetLog(const GuideLog& log, std::optional<size_t> current, Units units)
+void SessionSidebar::SetLog(const GuideLog& log, const std::vector<size_t>& selected, Units units)
 {
     m_updating = true;
 
@@ -180,10 +180,18 @@ void SessionSidebar::SetLog(const GuideLog& log, std::optional<size_t> current, 
             m_list->AppendItem(values);
         }
     }
-    if (current && *current < m_rows.size() && m_list->GetSelectedRow() != (int) *current)
-        m_list->SelectRow((unsigned int) *current);
-    else if (!current)
+    // select the rows, if they are not already
+    std::vector<size_t> now;
+    for (unsigned int r = 0; r < m_rows.size(); r++)
+        if (m_list->IsRowSelected(r))
+            now.push_back(r);
+    if (now != selected)
+    {
         m_list->UnselectAll();
+        for (size_t r : selected)
+            if (r < m_rows.size())
+                m_list->SelectRow((unsigned int) r);
+    }
 
     // the day the log starts, from its first section
     wxDateTime start;
@@ -219,7 +227,10 @@ void SessionSidebar::OnSelectionChanged(wxDataViewEvent&)
 {
     if (m_updating)
         return;
-    int row = m_list->GetSelectedRow();
-    if (row != wxNOT_FOUND && onSelect)
-        onSelect((size_t) row);
+    std::vector<size_t> rows;
+    for (unsigned int r = 0; r < m_rows.size(); r++)
+        if (m_list->IsRowSelected(r))
+            rows.push_back(r);
+    if (!rows.empty() && onSelect)
+        onSelect(rows);
 }

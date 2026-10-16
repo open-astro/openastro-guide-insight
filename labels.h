@@ -30,6 +30,7 @@
 #include <wx/datetime.h>
 
 #include <string>
+#include <vector>
 
 enum class Units { ArcSeconds, Pixels };
 
@@ -58,6 +59,10 @@ SectionRow RowFor(const GuideLog& log, size_t section, Units units);
 
 // A section's heading over the chart: "Guiding · 07:06:47".
 std::string SectionTitle(const GuideLog& log, size_t section);
+
+// The heading for several sessions shown as one:
+// "3 sessions · 07:06 – 08:40", from the first's start to the last's end.
+std::string CombinedTitle(const GuideLog& log, const std::vector<size_t>& sections);
 
 // The day a log starts: "Sunday, October 4, 2026".
 std::string DayHeading(const wxDateTime& when);

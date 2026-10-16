@@ -123,6 +123,21 @@ std::string SectionTitle(const GuideLog& log, size_t section)
     return SessionLabel(s) + DOT + ClockTime(s, "%H:%M:%S");
 }
 
+std::string CombinedTitle(const GuideLog& log, const std::vector<size_t>& sections)
+{
+    if (sections.empty())
+        return std::string();
+    const GuideSession& first = log.sessions[log.sections[sections.front()].idx];
+    const GuideSession& last = log.sessions[log.sections[sections.back()].idx];
+    std::string span;
+    if (first.starts.IsValid() && last.starts.IsValid())
+    {
+        wxDateTime end = last.starts + wxTimeSpan::Milliseconds(llround(last.duration * 1000.));
+        span = DOT + ClockTime(first) + " \u2013 " + end.Format("%H:%M").ToStdString();
+    }
+    return std::to_string(sections.size()) + " sessions" + span;
+}
+
 std::string DayHeading(const wxDateTime& when)
 {
     return when.Format("%A, %B ").ToStdString() + std::to_string(when.GetDay()) + ", " +

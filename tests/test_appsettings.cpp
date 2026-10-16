@@ -148,6 +148,20 @@ TEST_CASE("Analysis options are saved", "[appsettings]")
     CHECK(t.analysis.rawRa);
 }
 
+TEST_CASE("The running RMS options are saved", "[appsettings]")
+{
+    wxFileConfig c = Config("");
+    AppSettings s = LoadSettings(c);
+    CHECK_FALSE(s.display.runningRms);
+    CHECK(s.display.rmsWindow == 120);
+    s.display.runningRms = true;
+    s.display.rmsWindow = 300;
+    SaveSettings(c, s);
+    AppSettings t = LoadSettings(c);
+    CHECK(t.display.runningRms);
+    CHECK(t.display.rmsWindow == 300);
+}
+
 TEST_CASE("Choosing the theme colour again forgets the saved one", "[appsettings]")
 {
     wxFileConfig c = Config("[color]\nra=#123456\n");
