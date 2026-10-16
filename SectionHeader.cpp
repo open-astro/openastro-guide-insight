@@ -30,7 +30,7 @@ SectionHeader::SectionHeader(wxWindow *parent, const wxString& title, bool small
 {
     // draw over the parent's background where the platform allows it; the
     // style has to be set before the window is created
-    SetBackgroundStyle(IsTransparentBackgroundSupported() ? wxBG_STYLE_TRANSPARENT : wxBG_STYLE_PAINT);
+    PaintOverParent(this);
     Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxWANTS_CHARS,
            wxDefaultValidator, title);
     SetFont(small ? GetFont().Smaller() : GetFont().Bold());
@@ -101,11 +101,7 @@ void SectionHeader::Toggle()
 void SectionHeader::OnPaint(wxPaintEvent&)
 {
     wxAutoBufferedPaintDC dc(this);
-    if (GetBackgroundStyle() != wxBG_STYLE_TRANSPARENT)
-    {
-        dc.SetBackground(GetParent()->GetBackgroundColour());
-        dc.Clear();
-    }
+    ClearToParent(this, dc);
 
     wxSize sz = GetClientSize();
     std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));

@@ -19,93 +19,184 @@
 
 #include "ChartView.h"
 
+#include "OverviewScrubber.h"
+#include "TimelineCanvas.h"
+
 #include <wx/dcbuffer.h>
+#include <wx/graphics.h>
+#include <wx/simplebook.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 
-ChartView::ChartView(wxWindow *parent)
-    : wxPanel(parent, wxID_ANY), m_palette(CurrentPalette())
+#include <memory>
+#include <vector>
+
+ChartView::ChartView(wxWindow *parent, ChartHost& host)
+    : wxPanel(parent, wxID_ANY), m_host(host)
 {
+    int pad = FromDIP(16);
     auto sizer = new wxBoxSizer(wxVERTICAL);
 
+    // heading: title, subtitle, and the legend at the right
+    auto heading = new wxBoxSizer(wxHORIZONTAL);
     m_title = new wxStaticText(this, wxID_ANY, wxEmptyString);
     m_title->SetFont(GetFont().Bold().Larger());
-    m_subtitle = new wxStaticText(this, wxID_ANY, wxEmptyString);
+    m_subtitle = new wxStaticText(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+                                  wxST_ELLIPSIZE_END | wxST_NO_AUTORESIZE);
     m_subtitle->SetFont(GetFont().Smaller());
-    sizer->Add(m_title, 0, wxLEFT | wxRIGHT | wxTOP, FromDIP(14));
-    sizer->Add(m_subtitle, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(14));
-
-    m_canvas = new wxWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxWANTS_CHARS,
-                            "Chart");
-    m_canvas->SetBackgroundStyle(wxBG_STYLE_PAINT);
-    m_canvas->Bind(wxEVT_PAINT, &ChartView::OnPaintCanvas, this);
-    m_canvas->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
-        m_canvas->Refresh();
-        event.Skip();
+    m_legend = new wxWindow;
+    PaintOverParent(m_legend);
+    m_legend->Create(this, wxID_ANY, wxDefaultPosition, wxSize(0, GetCharHeight()), wxBORDER_NONE, "Legend");
+    m_legend->Bind(wxEVT_PAINT, [this](wxPaintEvent&) {
+        wxAutoBufferedPaintDC dc(m_legend);
+        ClearToParent(m_legend, dc);
+        std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
+        if (!gc || m_legendRa.empty())
+            return;
+        const Palette& pal = m_host.Colors();
+        gc->SetFont(GetFont().Smaller(), pal.text2);
+        double x = 0., h = m_legend->GetClientSize().y;
+        for (int i = 0; i < 2; i++)
+        {
+            const wxString& label = i == 0 ? m_legendRa : m_legendDec;
+            gc->SetPen(*wxTRANSPARENT_PEN);
+            gc->SetBrush(i == 0 ? pal.ra : pal.dec);
+            gc->DrawRoundedRectangle(x, h / 2. - FromDIP(2) / 2. - 0.5, FromDIP(14), FromDIP(3), 1.5);
+            x += FromDIP(20);
+            double tw, th;
+            gc->GetTextExtent(label, &tw, &th);
+            gc->DrawText(label, x, (h - th) / 2.);
+            x += tw + FromDIP(14);
+        }
     });
-    sizer->Add(m_canvas, 1, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(14));
+    heading->Add(m_title, 0, wxALIGN_CENTER_VERTICAL);
+    // the subtitle gives way to the legend when space is short
+    heading->Add(m_subtitle, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(12));
+    heading->Add(m_legend, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(12));
+    sizer->Add(heading, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
+    sizer->AddSpacer(FromDIP(10));
 
+    m_book = new wxSimplebook(this);
+    m_message = new wxWindow;
+    PaintOverParent(m_message);
+    m_message->Create(m_book, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE, "Chart");
+    m_message->Bind(wxEVT_PAINT, [this](wxPaintEvent&) {
+        wxAutoBufferedPaintDC dc(m_message);
+        ClearToParent(m_message, dc);
+        std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
+        if (!gc)
+            return;
+        const Palette& pal = m_host.Colors();
+        wxSize sz = m_message->GetClientSize();
+        gc->SetPen(wxPen(pal.border));
+        gc->SetBrush(pal.chart);
+        gc->DrawRoundedRectangle(0.5, 0.5, sz.x - 1., sz.y - 1., FromDIP(10));
+        if (m_messageText.empty())
+            return;
+        double tw, th, hw = 0., hh = 0.;
+        gc->SetFont(GetFont().Scaled(1.4f).Bold(), pal.text2);
+        gc->GetTextExtent(m_messageText, &tw, &th);
+        double y = sz.y / 2. - th;
+        gc->DrawText(m_messageText, (sz.x - tw) / 2., y);
+        if (!m_hint.empty())
+        {
+            gc->SetFont(GetFont(), pal.text2);
+            gc->GetTextExtent(m_hint, &hw, &hh);
+            gc->DrawText(m_hint, (sz.x - hw) / 2., y + th + FromDIP(6));
+        }
+    });
+    m_message->Bind(wxEVT_SIZE, [this](wxSizeEvent& e) { m_message->Refresh(); e.Skip(); });
+    m_timeline = new TimelineCanvas(m_book, host);
+    m_book->AddPage(m_message, "Message");
+    m_book->AddPage(m_timeline, "Timeline");
+    sizer->Add(m_book, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
+
+    sizer->AddSpacer(FromDIP(10));
+    m_overview = new OverviewScrubber(this, host);
+    sizer->Add(m_overview, 0, wxEXPAND | wxLEFT | wxRIGHT, pad);
+
+    sizer->AddSpacer(FromDIP(8));
     m_status = new wxStaticText(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
-                                wxST_ELLIPSIZE_END);
+                                wxST_ELLIPSIZE_END | wxST_NO_AUTORESIZE);
     m_status->SetFont(GetFont().Smaller());
-    sizer->Add(m_status, 0, wxEXPAND | wxALL, FromDIP(10));
+    sizer->Add(m_status, 0, wxEXPAND | wxLEFT | wxRIGHT, pad);
+    sizer->AddSpacer(FromDIP(10));
 
     SetSizer(sizer);
-    SetPalette(m_palette);
+    ApplyPalette();
 }
 
 void ChartView::SetHeading(const wxString& title, const wxString& subtitle)
 {
-    m_title->SetLabel(title);
-    m_subtitle->SetLabel(subtitle);
+    if (m_title->GetLabel() != title)
+        m_title->SetLabel(title);
+    if (m_subtitle->GetLabel() != subtitle)
+        m_subtitle->SetLabel(subtitle);
     Layout();
 }
 
-void ChartView::SetStatus(const wxString& status)
+void ChartView::SetLegend(const wxString& ra, const wxString& dec)
 {
+    m_legendRa = ra;
+    m_legendDec = dec;
+    // two swatches and their labels
+    int width = ra.empty() ? 0 : 2 * FromDIP(34) + GetTextExtent(ra).x + GetTextExtent(dec).x;
+    m_legend->SetMinSize(wxSize(width, GetCharHeight()));
+    Layout();
+    m_legend->Refresh();
+}
+
+void ChartView::SetDefaultStatus(const wxString& status)
+{
+    m_defaultStatus = status;
     m_status->SetLabel(status);
 }
 
-void ChartView::SetMessage(const wxString& message, const wxString& hint)
+void ChartView::ShowStatus(const wxString& status)
 {
-    m_message = message;
+    m_status->SetLabel(status.empty() ? m_defaultStatus : status);
+}
+
+void ChartView::ShowMessage(const wxString& message, const wxString& hint)
+{
+    m_messageText = message;
     m_hint = hint;
-    m_canvas->Refresh();
-}
-
-void ChartView::SetPalette(const Palette& palette)
-{
-    m_palette = palette;
-    m_subtitle->SetForegroundColour(palette.text2);
-    m_status->SetForegroundColour(palette.text2);
-    m_canvas->Refresh();
-}
-
-void ChartView::OnPaintCanvas(wxPaintEvent&)
-{
-    wxAutoBufferedPaintDC dc(m_canvas);
-    dc.SetBackground(m_palette.chart);
-    dc.Clear();
-
-    wxSize sz = m_canvas->GetClientSize();
-    dc.SetPen(wxPen(m_palette.border));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawRectangle(0, 0, sz.x, sz.y);
-
-    if (m_message.empty())
-        return;
-
-    wxFont big = GetFont().Scaled(1.4f).Bold();
-    dc.SetFont(big);
-    dc.SetTextForeground(m_palette.text2);
-    wxSize m = dc.GetTextExtent(m_message);
-    int y = sz.y / 2 - m.y;
-    dc.DrawText(m_message, (sz.x - m.x) / 2, y);
-
-    if (!m_hint.empty())
+    m_book->ChangeSelection(0);
+    m_message->Refresh();
+    if (m_overview->IsShown())
     {
-        dc.SetFont(GetFont());
-        wxSize h = dc.GetTextExtent(m_hint);
-        dc.DrawText(m_hint, (sz.x - h.x) / 2, y + m.y + FromDIP(6));
+        m_overview->Hide();
+        Layout();
     }
+}
+
+void ChartView::ShowTimeline()
+{
+    m_book->ChangeSelection(1);
+    if (!m_overview->IsShown())
+    {
+        m_overview->Show();
+        Layout();
+    }
+    RefreshChart();
+}
+
+void ChartView::RefreshChart()
+{
+    m_book->GetCurrentPage()->Refresh();
+    m_overview->Refresh();
+}
+
+void ChartView::ApplyPalette()
+{
+    const Palette& pal = m_host.Colors();
+    m_subtitle->SetForegroundColour(pal.text2);
+    m_status->SetForegroundColour(pal.text2);
+    m_legend->Refresh();
+    RefreshChart();
+}
+
+std::vector<wxWindow *> ChartView::DropTargets() const
+{
+    return { m_message, m_timeline };
 }

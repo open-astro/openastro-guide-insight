@@ -160,6 +160,8 @@ if(MSVC)
 endif()
 
 set(SRC
+  ChartHost.cpp
+  ChartHost.h
   ChartView.cpp
   ChartView.h
   icons.cpp
@@ -170,6 +172,8 @@ set(SRC
   LogViewApp.h
   MainFrame.cpp
   MainFrame.h
+  OverviewScrubber.cpp
+  OverviewScrubber.h
   SectionHeader.cpp
   SectionHeader.h
   Preferences.cpp
@@ -180,6 +184,8 @@ set(SRC
   SessionSidebar.h
   theme.cpp
   theme.h
+  TimelineCanvas.cpp
+  TimelineCanvas.h
 )
 
 if(WIN32)
