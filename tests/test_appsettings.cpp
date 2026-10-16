@@ -137,14 +137,14 @@ TEST_CASE("Analysis options are saved", "[appsettings]")
 {
     wxFileConfig c = Config("");
     AppSettings s = LoadSettings(c);
-    CHECK(s.analysis.driftCorrection);
+    CHECK(s.analysis.drift == DriftModel::Line);
     CHECK_FALSE(s.analysis.rawRa);
 
-    s.analysis.driftCorrection = false;
+    s.analysis.drift = DriftModel::Curve;
     s.analysis.rawRa = true;
     SaveSettings(c, s);
     AppSettings t = LoadSettings(c);
-    CHECK_FALSE(t.analysis.driftCorrection);
+    CHECK(t.analysis.drift == DriftModel::Curve);
     CHECK(t.analysis.rawRa);
 }
 

@@ -121,8 +121,9 @@ const char *HELP_HTML =
     "<p>These analyse the selection, or the whole session without one. <b>Edit &rsaquo; Select Guiding Assistant "
     "Run</b> selects a stretch where PHD2's Guiding Assistant had guide output off.</p>"
     "<ul>"
-    "<li><b>Drift</b> shows RA and Dec with the straight-line drift taken out; turn that off in the inspector's "
-    "Analysis section to see the raw drift.</li>"
+    "<li><b>Drift</b> shows RA and Dec with the drift taken out. In the inspector's Analysis section, choose a "
+    "straight line, a curve (for drift that speeds up or slows down, as a polar alignment error can make it), "
+    "or None to see the raw drift.</li>"
     "<li><b>Frequency</b> is RA's periodogram: periodic error shows as peaks. Point at the curve to read a peak. "
     "<i>Add back RA guide pulses</i> estimates the error guiding was correcting. "
     "<b>File &rsaquo; Export Periodogram as CSV</b> saves it.</li>"
@@ -781,7 +782,7 @@ const GARun *MainFrame::Analysis()
         if (GARun::CanAnalyze(*s, begin, end))
         {
             m_analysis = std::make_unique<GARun>();
-            m_analysis->Analyze(*s, begin, end, key.options.rawRa, key.options.driftCorrection);
+            m_analysis->Analyze(*s, begin, end, key.options.rawRa, key.options.drift);
         }
     }
     return m_analysis.get();
@@ -936,7 +937,9 @@ void MainFrame::UpdateChart()
     {
         bool drift = m_settings.view == ChartKind::Drift;
         const AnalysisOptions& a = m_settings.analysis;
-        wxString what = drift ? (a.driftCorrection ? "Drift removed" : "Drift not removed") : "RA periodogram";
+        wxString what = !drift ? wxString("RA periodogram") :
+            a.drift == DriftModel::None ? wxString("Drift not removed") :
+            a.drift == DriftModel::Line ? wxString("Straight-line drift removed") : wxString("Curved drift removed");
         if (a.rawRa)
             what += ", RA pulses added back";
         m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), what + wxString::FromUTF8(" \u00b7 ") + AnalysisScope());

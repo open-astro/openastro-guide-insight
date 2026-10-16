@@ -61,7 +61,7 @@ class MainFrame : public wxFrame, public ChartHost
         bool operator==(const AnalysisKey& o) const
         {
             return session == o.session && range.first == o.range.first && range.last == o.range.last &&
-                   options.driftCorrection == o.options.driftCorrection && options.rawRa == o.options.rawRa;
+                   options.drift == o.options.drift && options.rawRa == o.options.rawRa;
         }
     } m_analysisKey;
 

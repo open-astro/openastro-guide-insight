@@ -58,7 +58,7 @@ struct DisplayOptions
 // How the Drift and Frequency charts analyse the frames.
 struct AnalysisOptions
 {
-    bool driftCorrection = true; // remove a straight-line drift first (#19)
+    DriftModel drift = DriftModel::Line; // the drift to take out first (#19, #20)
     bool rawRa = false;          // add the RA guide pulses back
 };
 
