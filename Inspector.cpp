@@ -509,9 +509,38 @@ void Inspector::FillAssessment()
         }
     }
 
+    if (m_comparison)
+    {
+        caption("COMPARED WITH EARLIER NIGHTS");
+        const NightComparison& c = *m_comparison;
+        s->Add(text(p, c.text, m_palette.text, GetFont(), 0));
+        if (!c.changes.empty())
+        {
+            auto grid = new wxFlexGridSizer(2, wxSize(FromDIP(10), FromDIP(2)));
+            for (const SettingChange& ch : c.changes)
+            {
+                grid->Add(text(p, ch.setting, m_palette.text2, GetFont()));
+                grid->Add(text(p, ch.from + " \u2192 " + ch.to, m_palette.text, GetFont().Bold()));
+            }
+            s->Add(grid, 0, wxTOP, gap);
+        }
+        if (!c.trend.empty())
+            s->Add(text(p, c.trend, m_palette.text2, small, 0), 0, wxTOP, gap);
+    }
+
     s->Add(text(p, "Suggestions are starting points from this log. Change one setting at a time and compare the "
                    "next night's assessment.", m_palette.text2, small, 0), 0, wxTOP, FromDIP(8));
     WrapTexts();
+}
+
+void Inspector::SetComparison(const std::optional<NightComparison>& comparison)
+{
+    m_comparison = comparison;
+    if (m_assessed)
+    {
+        FillAssessment();
+        Relayout();
+    }
 }
 
 void Inspector::WrapTexts()
