@@ -25,6 +25,7 @@
 
 #include "appsettings.h"
 #include "document.h"
+#include "sessiondetails.h"
 #include "theme.h"
 
 #include <wx/scrolwin.h>
@@ -60,6 +61,9 @@ class Inspector : public wxScrolledWindow
     Section m_drift;
     wxStaticText *m_raDrift, *m_decDrift, *m_paError;
 
+    Section m_calibration;
+    wxFlexGridSizer *m_calibrationGrid;
+
     Section m_details;
     wxFlexGridSizer *m_detailsGrid;
     SectionHeader *m_rawHeader;
@@ -85,6 +89,7 @@ class Inspector : public wxScrolledWindow
     wxStaticText *AddField(wxWindow *parent, wxFlexGridSizer *grid, const wxString& label);
     wxStaticText *Secondary(wxStaticText *text);
     void AlignLabels();
+    void FillFields(wxWindow *parent, wxFlexGridSizer *grid, const std::vector<DetailField>& fields);
     void Relayout();
     ExclusionSettings Rules() const;
     DisplayOptions Options() const;

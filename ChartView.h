@@ -29,7 +29,9 @@
 
 #include <vector>
 
+class CalibrationCanvas;
 class OverviewScrubber;
+class ScatterCanvas;
 class TimelineCanvas;
 class wxSimplebook;
 class wxStaticText;
@@ -43,6 +45,8 @@ class ChartView : public wxPanel
     wxSimplebook *m_book;
     wxWindow *m_message;  // a page with text in the middle, when there is no chart
     TimelineCanvas *m_timeline;
+    ScatterCanvas *m_scatter;
+    CalibrationCanvas *m_calibration;
     OverviewScrubber *m_overview;
     wxStaticText *m_status;
     wxString m_messageText, m_hint;
@@ -63,11 +67,15 @@ public:
     // Text in the middle, for when there is nothing to chart.
     void ShowMessage(const wxString& message, const wxString& hint = wxString());
     void ShowTimeline();
+    void ShowScatter();
+    void ShowCalibration();
 
     void RefreshChart();
     void ApplyPalette();
 
     TimelineCanvas *Timeline() const { return m_timeline; }
+    // The chart being shown, if it can zoom.
+    Chart *ActiveChart() const;
     // Windows that should accept a dropped log file.
     std::vector<wxWindow *> DropTargets() const;
 };

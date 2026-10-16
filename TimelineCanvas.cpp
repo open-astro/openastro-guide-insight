@@ -19,6 +19,7 @@
 
 #include "TimelineCanvas.h"
 
+#include "chartdraw.h"
 #include "labels.h"
 #include "ticks.h"
 
@@ -43,11 +44,6 @@ const int DRAG_THRESHOLD = 3;
 
 // The zoom for one wheel notch, as the old window's + and - buttons.
 const double ZOOM_STEP = 1.1;
-
-wxColour WithAlpha(const wxColour& c, unsigned char alpha)
-{
-    return wxColour(c.Red(), c.Green(), c.Blue(), alpha);
-}
 
 wxString U(const std::string& utf8)
 {
@@ -136,10 +132,7 @@ void TimelineCanvas::OnPaint(wxPaintEvent&)
     if (!gc)
         return;
 
-    wxSize sz = GetClientSize();
-    gc->SetPen(wxPen(pal.border));
-    gc->SetBrush(pal.chart);
-    gc->DrawRoundedRectangle(0.5, 0.5, sz.x - 1., sz.y - 1., FromDIP(10));
+    DrawPanel(*gc, this, pal);
 
     if (m_host.Doc().Session() && View())
         Paint(*gc, PlotRect());
@@ -693,6 +686,18 @@ void TimelineCanvas::ZoomBy(double factor)
         v->horizontal.ZoomAbout(factor, x);
         m_host.ViewChanged();
     }
+}
+
+bool TimelineCanvas::CanZoomIn()
+{
+    SessionView *v = View();
+    return v && v->horizontal.CanZoomIn();
+}
+
+bool TimelineCanvas::CanZoomOut()
+{
+    SessionView *v = View();
+    return v && v->horizontal.CanZoomOut();
 }
 
 void TimelineCanvas::ZoomToFit()

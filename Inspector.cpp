@@ -103,6 +103,13 @@ Inspector::Inspector(wxWindow *parent)
         p->SetSizer(grid);
     }
 
+    // Calibration results
+    m_calibration = AddSection("Calibration");
+    {
+        m_calibrationGrid = FieldGrid();
+        m_calibration.body->SetSizer(m_calibrationGrid);
+    }
+
     // Session details
     m_details = AddSection("Session details");
     {
@@ -248,7 +255,10 @@ wxStaticText *Inspector::AddField(wxWindow *parent, wxFlexGridSizer *grid, const
     m_labels.push_back(name);
     grid->Add(name);
     auto value = new wxStaticText(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
-                                  wxST_ELLIPSIZE_END);
+                                  wxST_ELLIPSIZE_END | wxST_NO_AUTORESIZE);
+    // narrow at minimum, so a long value ends in an ellipsis instead of
+    // widening the inspector past its edge
+    value->SetMinSize(wxSize(FromDIP(40), -1));
     grid->Add(value, 1, wxEXPAND);
     return value;
 }
@@ -262,6 +272,25 @@ void Inspector::AlignLabels()
         widest = std::max(widest, t->GetBestSize().x);
     for (wxStaticText *t : m_labels)
         t->SetMinSize(wxSize(widest, -1));
+}
+
+// Replaces the fields in a grid.
+void Inspector::FillFields(wxWindow *parent, wxFlexGridSizer *grid, const std::vector<DetailField>& fields)
+{
+    for (wxSizerItem *item : grid->GetChildren())
+    {
+        wxWindow *w = item->GetWindow();
+        std::erase_if(m_secondary, [w](wxStaticText *t) { return t == w; });
+        std::erase_if(m_labels, [w](wxStaticText *t) { return t == w; });
+    }
+    grid->Clear(true);
+    for (const DetailField& f : fields)
+    {
+        wxStaticText *value = AddField(parent, grid, U(f.label));
+        value->SetLabel(U(f.value));
+        value->SetToolTip(U(f.value));
+    }
+    AlignLabels();
 }
 
 wxStaticText *Inspector::Secondary(wxStaticText *text)
@@ -326,9 +355,13 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
         section = doc.CalibrationSection();
 
     m_empty->Show(!section);
+    const Calibration *cal = doc.CalibrationSection();
     for (Section *s : { &m_summary, &m_drift, &m_display, &m_exclusions })
         s->Show(session != nullptr);
+    m_calibration.Show(cal != nullptr);
     m_details.Show(section != nullptr);
+    if (cal)
+        FillFields(m_calibration.body, m_calibrationGrid, CalibrationDetails(*cal));
 
     if (session)
     {
@@ -382,20 +415,7 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
 
     if (section)
     {
-        wxWindow *p = m_details.body;
-        for (wxSizerItem *item : m_detailsGrid->GetChildren())
-        {
-            wxWindow *w = item->GetWindow();
-            std::erase_if(m_secondary, [w](wxStaticText *t) { return t == w; });
-            std::erase_if(m_labels, [w](wxStaticText *t) { return t == w; });
-        }
-        m_detailsGrid->Clear(true);
-        for (const DetailField& f : SessionDetails(section->hdr))
-        {
-            wxStaticText *value = AddField(p, m_detailsGrid, U(f.label));
-            value->SetLabel(U(f.value));
-            value->SetToolTip(U(f.value));
-        }
+        FillFields(m_details.body, m_detailsGrid, SessionDetails(section->hdr));
 
         wxString raw;
         for (const wxString& line : section->hdr)
