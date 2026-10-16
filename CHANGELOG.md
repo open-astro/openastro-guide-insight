@@ -9,7 +9,7 @@ All notable changes to OpenAstro Guide Insight, and to PHD2 Log Viewer before it
 - The chart switches between Timeline, Scatter, Drift and Frequency; the separate analysis window is gone
 - Timeline: drag to select frames and see their statistics; scroll, pinch and an overview strip to move around; a time axis option; hover for any frame's details
 - Scatter: full size, with labelled scale rings
-- Drift: drift correction can be turned off
+- Drift: the drift taken out can be a straight line, a curve, or none
 - Frequency: pointing snaps to the nearest peak; export as CSV from the File menu
 - Light and dark appearance, standard menus and shortcuts, Open Recent, Preferences, and a rewritten Help
 - Exclusion settings now apply to every session when changed

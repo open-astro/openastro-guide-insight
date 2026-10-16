@@ -27,6 +27,8 @@
 
 #include <cmath>
 #include <sstream>
+#include <vector>
+#include <algorithm>
 #include <fstream>
 
 using Catch::Matchers::WithinAbs;
@@ -310,7 +312,7 @@ TEST_CASE("Drift correction can be turned off", "[analysis]")
     CHECK(fabs(corrected.rac[corrected.len - 1] - corrected.rac[0]) < 1.0);
 
     GARun raw;
-    raw.Analyze(s, 0, s.entries.size(), false, false);
+    raw.Analyze(s, 0, s.entries.size(), false, DriftModel::None);
     CHECK_THAT(raw.rac[raw.len - 1] - raw.rac[0], WithinAbs(48., 0.5));
     CHECK(raw.decc[0] == s.entries[0].decraw);
 }
@@ -329,4 +331,59 @@ TEST_CASE("Ordinary guiding has no Guiding Assistant runs", "[analysis]")
 {
     CHECK(GuidingAssistantRuns(Labelled("gggggggggggggggg")).empty());
     CHECK(GuidingAssistantRuns(LoadRealLog().sessions[1]).empty());
+}
+
+TEST_CASE("A polynomial fit recovers a quadratic exactly", "[analysis]")
+{
+    std::vector<double> x, y;
+    for (int i = 0; i < 50; i++)
+    {
+        double t = 1000. + 7. * i; // far from zero, as frame times are
+        x.push_back(t);
+        y.push_back(3. - 0.5 * (t - 1100.) + 0.002 * (t - 1100.) * (t - 1100.));
+    }
+    Polynomial p = PolyFit(x.data(), y.data(), x.size(), 2);
+    for (size_t i = 0; i < x.size(); i++)
+        CHECK_THAT(p(x[i]), WithinAbs(y[i], 1e-6));
+}
+
+TEST_CASE("A straight-line fit of a line is the line", "[analysis]")
+{
+    std::vector<double> x{ 0., 1., 2., 3. }, y{ 1., 3., 5., 7. };
+    Polynomial p = PolyFit(x.data(), y.data(), x.size(), 1);
+    CHECK_THAT(p(10.), WithinAbs(21., 1e-9));
+}
+
+TEST_CASE("Too few points for the order fit a lower order", "[analysis]")
+{
+    std::vector<double> x{ 5. }, y{ 2. };
+    Polynomial p = PolyFit(x.data(), y.data(), x.size(), 2);
+    CHECK_THAT(p(100.), WithinAbs(2., 1e-9));
+}
+
+TEST_CASE("A curved drift is removed by the curve model, not the line", "[analysis]")
+{
+    // RA drifts along a parabola, as a polar alignment error can make it,
+    // under a small periodic error
+    GuideSession s("2026-01-01 00:00:00");
+    for (int i = 0; i < 400; i++)
+    {
+        double t = 2. * i;
+        double ra = 1e-4 * (t - 400.) * (t - 400.) + 0.2 * sin(2. * M_PI * t / 120.);
+        s.entries.push_back(MakeEntry(i + 1, t, ra, 0.));
+    }
+
+    auto largest = [](const GARun& ga) {
+        double m = 0.;
+        for (size_t i = 0; i < ga.len; i++)
+            m = std::max(m, fabs(ga.rac[i]));
+        return m;
+    };
+
+    GARun line, curve;
+    line.Analyze(s, 0, s.entries.size(), false, DriftModel::Line);
+    curve.Analyze(s, 0, s.entries.size(), false, DriftModel::Curve);
+    CHECK(largest(line) > 5.);
+    CHECK(largest(curve) < 0.25);
+    CHECK_THAT(curve.fftx[PeakIndex(curve)], WithinAbs(120., 6.));
 }

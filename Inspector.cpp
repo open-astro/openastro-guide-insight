@@ -110,18 +110,24 @@ Inspector::Inspector(wxWindow *parent)
         auto s = new wxBoxSizer(wxVERTICAL);
         m_scope = Secondary(new wxStaticText(p, wxID_ANY, wxEmptyString));
         s->Add(m_scope, 0, wxBOTTOM, FromDIP(6));
-        m_driftCorrection = new wxCheckBox(p, wxID_ANY, "Remove drift");
-        m_driftCorrection->SetToolTip("Take a straight-line drift out of RA and Dec before analysing them");
+        auto send = [this] {
+            if (onAnalysis)
+                onAnalysis(AnalysisOptions{ (DriftModel) m_driftModel->GetSelection(), m_rawRa->GetValue() });
+        };
+        auto row = new wxBoxSizer(wxHORIZONTAL);
+        wxStaticText *label = Secondary(new wxStaticText(p, wxID_ANY, "Remove drift"));
+        row->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(10));
+        // in DriftModel's order: None, Line, Curve
+        m_driftModel = new SegmentedControl(p, wxID_ANY, { "None", "Line", "Curve" }, "Remove drift");
+        m_driftModel->SetToolTip("Take a straight-line or curved (quadratic) drift out of RA and Dec before analysing "
+                            "them, or none to see the raw drift");
+        m_driftModel->Bind(wxEVT_CHOICE, [send](wxCommandEvent&) { send(); });
+        row->Add(m_driftModel);
+        s->Add(row, 0, wxBOTTOM, FromDIP(8));
         m_rawRa = new wxCheckBox(p, wxID_ANY, "Add back RA guide pulses");
         m_rawRa->SetToolTip("Analyse RA as it would have moved without guiding, by adding the RA pulses back");
-        for (wxCheckBox *cb : { m_driftCorrection, m_rawRa })
-        {
-            s->Add(cb, 0, wxBOTTOM, FromDIP(4));
-            cb->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
-                if (onAnalysis)
-                    onAnalysis(AnalysisOptions{ m_driftCorrection->GetValue(), m_rawRa->GetValue() });
-            });
-        }
+        m_rawRa->Bind(wxEVT_CHECKBOX, [send](wxCommandEvent&) { send(); });
+        s->Add(m_rawRa, 0, wxBOTTOM, FromDIP(4));
         m_selectGa = new wxButton(p, wxID_ANY, "Select Guiding Assistant Run");
         m_selectGa->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
             if (onSelectGuidingAssistant)
@@ -335,7 +341,7 @@ void Inspector::SetPalette(const Palette& palette)
         t->SetForegroundColour(palette.text2);
     for (SectionHeader *h : m_headers)
         h->SetPalette(palette);
-    for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device })
+    for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device, m_driftModel })
         c->SetPalette(palette);
     Refresh();
 }
@@ -397,7 +403,7 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
         if (!GARun::CanAnalyze(*session, begin, end))
             scope += wxString::FromUTF8(" \u00b7 too few frames: analysis needs 12 that count");
         m_scope->SetLabel(scope);
-        m_driftCorrection->SetValue(settings.analysis.driftCorrection);
+        m_driftModel->SetSelection((int) settings.analysis.drift);
         m_rawRa->SetValue(settings.analysis.rawRa);
         m_selectGa->Show(!GuidingAssistantRuns(*session).empty());
     }
