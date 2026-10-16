@@ -99,6 +99,8 @@ find_package(GSL REQUIRED)
 # version.h carries the project version into the code, and the installer
 # script gets it the same way.
 configure_file(version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
+# for packaging scripts that name files by version
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/version.txt "${PROJECT_VERSION}\n")
 if(WIN32)
   configure_file(openastro-guide-insight-x64.iss.in ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.iss @ONLY)
 endif()
@@ -189,6 +191,19 @@ if(WIN32)
   list(APPEND SRC openastro-guide-insight.rc)
 endif()
 
+# The macOS icon is made from the PNG at build time.
+if(APPLE)
+  set(GUIDEINSIGHT_ICNS ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.icns)
+  add_custom_command(
+    OUTPUT ${GUIDEINSIGHT_ICNS}
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make-icns.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/openastro-guide-insight.png ${GUIDEINSIGHT_ICNS}
+    DEPENDS openastro-guide-insight.png scripts/make-icns.sh
+    COMMENT "Making the macOS icon")
+  set_source_files_properties(${GUIDEINSIGHT_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  list(APPEND SRC ${GUIDEINSIGHT_ICNS})
+endif()
+
 add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC})
 
 # The resource file embeds wxWidgets' manifest (DPI awareness, common
@@ -211,7 +226,7 @@ if(APPLE)
     OUTPUT_NAME                        "OpenAstro Guide Insight"
     MACOSX_BUNDLE_BUNDLE_NAME          "OpenAstro Guide Insight"
     MACOSX_BUNDLE_GUI_IDENTIFIER       "org.openastro.guideinsight"
-    MACOSX_BUNDLE_ICON_FILE            openastro-guide-insight.ico
+    MACOSX_BUNDLE_ICON_FILE            openastro-guide-insight.icns
     MACOSX_BUNDLE_INFO_STRING          "OpenAstro Guide Insight, a fork of PHD2 Log Viewer"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_LONG_VERSION_STRING  "${PROJECT_VERSION}"
