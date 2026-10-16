@@ -64,6 +64,11 @@ std::optional<size_t> FrameAt(const GuideSession::EntryVec& entries, double posi
 // labels in the same row keep `gap` apart: 0 is the first row.
 std::vector<int> StackLabels(const std::vector<double>& left, const std::vector<double>& width, double gap);
 
+// Each frame's total RMS (RA and Dec combined, as in the statistics) over
+// the counted frames taken in the `window` seconds up to and including it.
+// NaN where fewer than two frames count.
+std::vector<double> RunningRms(const GuideSession::EntryVec& entries, double window);
+
 // Whether the session has guide pulses for both a mount and an AO.
 bool HasBothDevices(const GuideSession& session);
 

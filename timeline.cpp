@@ -132,3 +132,37 @@ bool HasBothDevices(const GuideSession& session)
     }
     return mount && ao;
 }
+
+std::vector<double> RunningRms(const GuideSession::EntryVec& entries, double window)
+{
+    std::vector<double> rms(entries.size(), NAN);
+    // running sums over the counted frames in the window
+    double n = 0., sx = 0., sxx = 0., sy = 0., syy = 0.;
+    size_t first = 0; // the oldest frame still in the window
+    auto counted = [](const GuideEntry& e) { return e.included && StarWasFound(e.err); };
+    auto add = [&](const GuideEntry& e, double sign) {
+        n += sign;
+        sx += sign * e.raraw;
+        sxx += sign * e.raraw * e.raraw;
+        sy += sign * e.decraw;
+        syy += sign * e.decraw * e.decraw;
+    };
+
+    for (size_t i = 0; i < entries.size(); i++)
+    {
+        if (counted(entries[i]))
+            add(entries[i], 1.);
+        while (entries[first].dt <= entries[i].dt - window)
+        {
+            if (counted(entries[first]))
+                add(entries[first], -1.);
+            first++;
+        }
+        if (n >= 2.)
+        {
+            double var = sxx / n - (sx / n) * (sx / n) + syy / n - (sy / n) * (sy / n);
+            rms[i] = sqrt(std::max(var, 0.));
+        }
+    }
+    return rms;
+}
