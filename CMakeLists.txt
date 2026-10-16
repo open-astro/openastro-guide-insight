@@ -129,6 +129,8 @@ add_library(guideinsight_core STATIC
   analysis.h
   graphmath.cpp
   graphmath.h
+  ticks.cpp
+  ticks.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
