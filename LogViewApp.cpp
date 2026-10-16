@@ -21,11 +21,15 @@
 #include "LogViewApp.h"
 #include "MainFrame.h"
 #include "settingsmigration.h"
+#include "version.h"
 
 #include <gsl/gsl_errno.h>
 #include <wx/cmdline.h>
 #include <wx/config.h>
 #include <wx/log.h>
+
+#include <cstdio>
+#include <cstdlib>
 
 static void gsl_error_handler(const char *WXUNUSED(reason), const char *WXUNUSED(file), int WXUNUSED(line), int WXUNUSED(gsl_errno))
 {
@@ -50,6 +54,14 @@ bool LogViewApp::OnInit()
     if (!wxApp::OnInit())
         return false;
 
+    if (m_printVersion)
+    {
+        // for scripts, and the packaging checks
+        printf("%s %s\n", GetAppDisplayName().utf8_str().data(), GUIDEINSIGHT_VERSION);
+        fflush(stdout);
+        std::exit(EXIT_SUCCESS);
+    }
+
     wxLog::SetActiveTarget(new wxLogStderr());
     gsl_set_error_handler(&gsl_error_handler);
 
@@ -64,6 +76,7 @@ bool LogViewApp::OnInit()
 
 void LogViewApp::OnInitCmdLine(wxCmdLineParser& parser)
 {
+    parser.AddSwitch(wxEmptyString, "version", "Print the version and exit");
     parser.AddParam("filename", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL);
 }
 
@@ -71,6 +84,7 @@ bool LogViewApp::OnCmdLineParsed(wxCmdLineParser& parser)
 {
     if (parser.GetParamCount() > 1)
         return false;
+    m_printVersion = parser.Found("version");
     if (parser.GetParamCount() == 1)
         m_openFile = parser.GetParam(0);
     return true;

@@ -29,6 +29,7 @@ class LogViewApp : public wxApp
 {
     MainFrame *m_frame = nullptr;
     wxString m_openFile;
+    bool m_printVersion = false;
 
 public:
     LogViewApp();

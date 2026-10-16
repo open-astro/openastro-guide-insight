@@ -20,10 +20,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # 22.04 keeps the AppImage's glibc requirement low
           - arch: x86_64
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -31,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build libgtk-3-dev libgsl-dev libpcre2-dev zlib1g-dev libpng-dev libjpeg-dev libtiff-dev libexpat1-dev
+          sudo apt-get install -y --no-install-recommends ninja-build libgtk-3-dev libgsl-dev libpcre2-dev zlib1g-dev libpng-dev libjpeg-dev libtiff-dev libexpat1-dev file xvfb
           # a decimal-comma locale for the locale-independence tests
           sudo locale-gen de_DE.UTF-8
 
@@ -63,13 +64,18 @@ jobs:
       - name: Install
         run: DESTDIR=${{ github.workspace }}/stage cmake --install out/build/linux
 
-      - name: Package artifact
-        run: tar -C stage -czf openastro-guide-insight-linux-${{ matrix.arch }}.tar.gz .
+      - name: Package AppImage
+        run: |
+          version=$(cat out/build/linux/version.txt)
+          package=openastro-guide-insight-$version-linux-${{ matrix.arch }}.AppImage
+          scripts/make-appimage.sh stage ${{ matrix.arch }} "$version" "$package"
+          scripts/check-appimage.sh "$package" "$version"
+          echo "PACKAGE=$package" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v7
         with:
           name: openastro-guide-insight-linux-${{ matrix.arch }}
-          path: openastro-guide-insight-linux-${{ matrix.arch }}.tar.gz
+          path: ${{ env.PACKAGE }}
           if-no-files-found: error
 
   sanitizers:
