@@ -24,6 +24,7 @@ add_executable(guideinsight_tests
   test_labels.cpp
   test_appsettings.cpp
   test_timeline.cpp
+  test_scatter.cpp
   test_exclusion.cpp
   test_settingsmigration.cpp
 )
