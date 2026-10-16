@@ -71,7 +71,8 @@ class Inspector : public wxScrolledWindow
 
     Section m_analysis;
     wxStaticText *m_scope;
-    wxCheckBox *m_driftCorrection, *m_rawRa;
+    SegmentedControl *m_driftModel;
+    wxCheckBox *m_rawRa;
     wxButton *m_selectGa;
 
     Section m_display;
