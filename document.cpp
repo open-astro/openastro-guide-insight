@@ -21,6 +21,8 @@
 
 #include <algorithm>
 #include <istream>
+#include <string>
+#include <utility>
 #include <math.h>
 
 // The closest zoom on a frame axis, in pixels per frame.
@@ -100,6 +102,7 @@ bool Document::Load(std::istream& is, const std::function<void()>& progress)
     }
 
     ResetViews();
+    m_combinedSections.clear();
     m_selection.reset();
     m_current.reset();
     if (!m_log.sections.empty())
@@ -115,6 +118,8 @@ void Document::SetExclusions(const ExclusionSettings& settings)
         ApplyExclusions(s, m_exclusions);
         s.CalcStats();
     }
+    if (Combined())
+        BuildCombined();
 }
 
 void Document::Select(size_t section)
@@ -122,11 +127,98 @@ void Document::Select(size_t section)
     if (section >= m_log.sections.size())
         return;
     m_current = section;
+    m_combinedSections.clear();
     m_selection.reset();
+}
+
+void Document::SelectSections(const std::vector<size_t>& sections)
+{
+    std::vector<size_t> guiding;
+    for (size_t i = 0; i < m_log.sections.size(); i++)
+        if (m_log.sections[i].type == GUIDING_SECTION &&
+            std::find(sections.begin(), sections.end(), i) != sections.end())
+            guiding.push_back(i);
+
+    if (guiding.size() < 2)
+    {
+        if (!guiding.empty())
+            Select(guiding.front());
+        else if (!sections.empty())
+            Select(sections.front());
+        return;
+    }
+
+    m_current = guiding.front();
+    m_combinedSections = guiding;
+    m_selection.reset();
+    BuildCombined();
+    m_combinedView = SessionView{ NewViewport(m_combined.entries, m_axis), VerticalView() };
+}
+
+std::vector<size_t> Document::Sections() const
+{
+    if (Combined())
+        return m_combinedSections;
+    if (m_current)
+        return { *m_current };
+    return {};
+}
+
+void Document::BuildCombined()
+{
+    const GuideSession& first = m_log.sessions[m_log.sections[m_combinedSections.front()].idx];
+    m_combined = GuideSession(first.date);
+    m_combined.starts = first.starts;
+    m_combined.hdr = first.hdr;
+    m_combined.pixelScale = first.pixelScale;
+    m_combined.declination = first.declination;
+    m_combined.mount = first.mount;
+    m_combined.ao = first.ao;
+    m_sources.clear();
+
+    double end = 0.; // the last frame's time so far, for sessions without a start time
+    for (size_t section : m_combinedSections)
+    {
+        size_t si = m_log.sections[section].idx;
+        const GuideSession& s = m_log.sessions[si];
+        double offset = s.starts.IsValid() && first.starts.IsValid() ?
+            (s.starts - first.starts).GetMilliseconds().ToDouble() / 1000. : end;
+        // distances in the first session's pixels
+        float k = (float) (first.pixelScale > 0. ? s.pixelScale / first.pixelScale : 1.);
+        int base = (int) m_combined.entries.size();
+
+        InfoEntry marker;
+        marker.idx = base;
+        marker.repeats = 1;
+        marker.info = "Session " + std::string(s.starts.IsValid() ? s.starts.Format("%H:%M:%S").utf8_str()
+                                                                     : s.date.utf8_str());
+        m_combined.infos.push_back(marker);
+        for (InfoEntry info : s.infos)
+        {
+            info.idx += base;
+            m_combined.infos.push_back(info);
+        }
+
+        for (size_t i = 0; i < s.entries.size(); i++)
+        {
+            GuideEntry e = s.entries[i];
+            e.dt = (float) (e.dt + offset);
+            for (float *v : { &e.dx, &e.dy, &e.raraw, &e.decraw, &e.raguide, &e.decguide })
+                *v *= k;
+            m_combined.entries.push_back(e);
+            m_sources.emplace_back(si, i);
+        }
+        if (!m_combined.entries.empty())
+            end = m_combined.entries.back().dt;
+    }
+    m_combined.duration = end;
+    m_combined.CalcStats();
 }
 
 const GuideSession *Document::Session() const
 {
+    if (Combined())
+        return &m_combined;
     if (!m_current)
         return nullptr;
     const LogSectionLoc& loc = m_log.sections[*m_current];
@@ -140,7 +232,7 @@ GuideSession *Document::Session()
 
 const Calibration *Document::CalibrationSection() const
 {
-    if (!m_current)
+    if (!m_current || Combined())
         return nullptr;
     const LogSectionLoc& loc = m_log.sections[*m_current];
     return loc.type == CALIBRATION_SECTION ? &m_log.calibrations[loc.idx] : nullptr;
@@ -165,34 +257,51 @@ GuideStats Document::Stats() const
     return CalcStats(*s, 0, s->entries.size());
 }
 
+void Document::SetIncluded(const IndexRun& run, bool include)
+{
+    if (!Combined())
+    {
+        GuideSession *s = Session();
+        if (!s || run.first > run.last)
+            return;
+        ::IncludeFrames(*s, run, include);
+        s->CalcStats();
+        return;
+    }
+
+    std::vector<bool> touched(m_log.sessions.size(), false);
+    for (size_t i = run.first; i <= run.last && i < m_sources.size(); i++)
+    {
+        auto [session, entry] = m_sources[i];
+        m_log.sessions[session].entries[entry].included = include;
+        touched[session] = true;
+    }
+    for (size_t i = 0; i < touched.size(); i++)
+        if (touched[i])
+            m_log.sessions[i].CalcStats();
+    BuildCombined();
+}
+
 void Document::IncludeSelection(bool include)
 {
     GuideSession *s = Session();
-    if (!s)
+    if (!s || s->entries.empty())
         return;
-    if (m_selection)
-        ::IncludeFrames(*s, *m_selection, include);
-    else
-        IncludeRange(s->entries, include);
-    s->CalcStats();
+    SetIncluded(m_selection ? *m_selection : IndexRun{ 0, (unsigned int) s->entries.size() - 1 }, include);
 }
 
 void Document::IncludeFrames(const IndexRun& run, bool include)
 {
-    GuideSession *s = Session();
-    if (!s || run.first > run.last)
-        return;
-    ::IncludeFrames(*s, run, include);
-    s->CalcStats();
+    if (Session())
+        SetIncluded(run, include);
 }
 
 void Document::IncludeAll(bool include)
 {
     GuideSession *s = Session();
-    if (!s)
+    if (!s || s->entries.empty())
         return;
-    IncludeRange(s->entries, include);
-    s->CalcStats();
+    SetIncluded(IndexRun{ 0, (unsigned int) s->entries.size() - 1 }, include);
 }
 
 SessionView *Document::View()
@@ -200,7 +309,7 @@ SessionView *Document::View()
     GuideSession *s = Session();
     if (!s)
         return nullptr;
-    SessionView *v = &m_views[m_log.sections[*m_current].idx];
+    SessionView *v = Combined() ? &m_combinedView : &m_views[m_log.sections[*m_current].idx];
     if (VerticalScaleLocked())
         v->vertical.SetScale(m_lock * s->pixelScale);
     return v;
@@ -211,10 +320,7 @@ void Document::SetXAxis(XAxis axis)
     if (axis == m_axis)
         return;
 
-    for (size_t i = 0; i < m_views.size(); i++)
-    {
-        const auto& entries = m_log.sessions[i].entries;
-        Viewport& h = m_views[i].horizontal;
+    auto convert = [this, axis](const GuideSession::EntryVec& entries, Viewport& h) {
         double first = IndexAtPosition(entries, h.First(), m_axis);
         double last = IndexAtPosition(entries, h.Last(), m_axis);
         double width = h.Width();
@@ -222,7 +328,11 @@ void Document::SetXAxis(XAxis axis)
         h = NewViewport(entries, axis);
         h.SetWidth(width);
         h.Show(PositionAtIndex(entries, first, axis), PositionAtIndex(entries, last, axis));
-    }
+    };
+    for (size_t i = 0; i < m_views.size(); i++)
+        convert(m_log.sessions[i].entries, m_views[i].horizontal);
+    if (Combined())
+        convert(m_combined.entries, m_combinedView.horizontal);
     m_axis = axis;
 }
 
@@ -258,7 +368,10 @@ void Document::LockVerticalScale(bool lock)
     }
 
     if (VerticalScaleLocked())
+    {
         for (size_t i = 0; i < m_views.size(); i++)
             m_views[i].vertical.SetScale(m_lock * m_log.sessions[i].pixelScale);
+        m_combinedView.vertical.SetScale(m_lock * m_combined.pixelScale);
+    }
     m_lock = 0.;
 }

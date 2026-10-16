@@ -49,11 +49,12 @@ class SessionSidebar : public wxPanel
 public:
     explicit SessionSidebar(wxWindow *parent);
 
-    // Called with the index into GuideLog::sections when the user picks one.
-    std::function<void(size_t)> onSelect;
+    // Called with the indices into GuideLog::sections the user picked: one,
+    // or several guiding sessions to show as one.
+    std::function<void(const std::vector<size_t>&)> onSelect;
 
-    // Shows the log's sections, with `current` selected.
-    void SetLog(const GuideLog& log, std::optional<size_t> current, Units units);
+    // Shows the log's sections, with `selected` selected.
+    void SetLog(const GuideLog& log, const std::vector<size_t>& selected, Units units);
     void SetPalette(const Palette& palette);
     void FocusList() { m_list->SetFocus(); }
 

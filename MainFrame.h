@@ -84,6 +84,9 @@ class MainFrame : public wxFrame, public ChartHost
     void UpdateChart();
     void SetView(ChartKind view);
     void SelectSection(size_t section);
+    void SelectSections(const std::vector<size_t>& sections);
+    // The heading over the chart: the section, or the combined sessions.
+    wxString Heading() const;
     void ShowSidebar(bool show);
     void ShowInspector(bool show);
     void ApplyPalette();

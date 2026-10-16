@@ -80,6 +80,8 @@ class Inspector : public wxScrolledWindow
     wxStaticText *m_deviceLabel;
     wxCheckBox *m_showRa, *m_showDec, *m_corrections, *m_events, *m_grid, *m_limits, *m_mass, *m_snr;
     wxCheckBox *m_lock;
+    wxCheckBox *m_runningRms;
+    SegmentedControl *m_rmsWindow;
     DisplayOptions m_options;
 
     Section m_exclusions;

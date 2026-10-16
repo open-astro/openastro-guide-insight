@@ -52,6 +52,8 @@ struct DisplayOptions
     bool ra = true, dec = true;
     bool corrections = true, grid = true, events = true;
     bool limits = false, mass = false, snr = false;
+    bool runningRms = false; // total RMS over a trailing window
+    int rmsWindow = 120;     // seconds
     WhichMount device = MOUNT; // whose corrections to show; not saved
 };
 
