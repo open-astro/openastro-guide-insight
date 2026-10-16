@@ -502,7 +502,7 @@ TEST_CASE("frequent RA pulses on random errors with short exposures are correcti
     REQUIRE_FALSE(f->changes.empty());
     CHECK(f->changes[0].setting == "Exposure");
     CHECK(f->changes[0].from == "1.0 s");
-    CHECK(f->changes[0].to == "2–3 s");
+    CHECK(f->changes[0].to == "2–4 s"); // PHD2's Guiding Assistant range
     CHECK(Has(f->evidence, "RA pulses on 60% of frames"));
     // the cost is stated, so the user can weigh it
     CHECK(Has(f->body, "about"));
@@ -644,12 +644,145 @@ TEST_CASE("the RedCat 51 night is assessed as the guiding it was", "[assessment]
     CHECK(Has(a.why, "0.32 of a guide-camera pixel"));
     CHECK(Has(a.why, "randomly"));
 
-    REQUIRE(a.improve.size() >= 2);
-    CHECK(a.improve[0].title == "RA is correcting noise");
-    CHECK(a.improve[0].changes[0].from == "0.5 s"); // changed from 1 s early in the session
+    const Finding *noise = Find(a.improve, "RA is correcting noise");
+    REQUIRE(noise);
+    CHECK(noise->changes[0].from == "0.5 s"); // changed from 1 s early in the session
+    CHECK(Find(a.improve, "Frames arrive every 2.5 s"));
+    CHECK(Find(a.improve, "Guide star faded"));
+    CHECK(Find(a.improve, "Dec may have backlash"));
     CHECK(Find(a.improve, "Dec is pushed both ways"));
     CHECK(Find(a.improve, "Worse around 07:"));
     CHECK(Find(a.good, "Dithers settled"));
     CHECK(Find(a.good, "Polar alignment 0.2\u2032"));
     CHECK(Find(a.good, "Star held"));
+}
+
+// ---------------------------------------------------------------------------
+// PHD2's Guiding Assistant rules, and the slow loop, fading star, backlash
+// and saturation checks
+
+namespace {
+
+GuideSession Quiet(size_t n = 300, double cadence = 2.)
+{
+    Noise ra, dec;
+    return Session(n, cadence, [&](size_t) { return 0.3 * ra(); }, [&](size_t) { return 0.3 * dec(); });
+}
+
+void SetHeader(GuideSession& s, const char *prefix, const char *line)
+{
+    for (wxString& l : s.hdr)
+        if (l.StartsWith(prefix))
+            l = line;
+}
+
+} // namespace
+
+TEST_CASE("polar alignment between 5 and 10 arc-minutes could be improved", "[assessment]")
+{
+    GuideSession s = Quiet();
+    GuideStats stats = CalcStats(s, 0, s.entries.size());
+    stats.paerr = 7.;
+    Assessment a = AssessAll(s, &stats);
+    const Finding *f = Find(a.improve, "Polar alignment is 7′ off");
+    REQUIRE(f);
+    CHECK(Has(f->body, "could be improved"));
+
+    stats.paerr = 14.;
+    Assessment worse = AssessAll(s, &stats);
+    f = Find(worse.improve, "Polar alignment is 14′ off");
+    REQUIRE(f);
+    CHECK(Has(f->body, "drift-align"));
+
+    stats.paerr = 4.;
+    CHECK(Find(AssessAll(s, &stats).good, "Polar alignment 4.0′"));
+}
+
+TEST_CASE("frames that arrive much slower than the exposure mean a slow guide loop", "[assessment]")
+{
+    GuideSession s = Quiet(300, 2.5);
+    SetHeader(s, "Exposure = ", "Exposure = 500 ms");
+    Measurements m = Measure(s, 0, s.entries.size());
+    CHECK(m.cadence == Approx(2.5));
+    Assessment a = AssessAll(s);
+    const Finding *f = Find(a.improve, "Frames arrive every 2.5 s");
+    REQUIRE(f);
+    CHECK(Has(f->body, "0.5 s"));
+    CHECK(Has(f->body, "2.0 s"));
+
+    // a quick loop, or a delay the user asked for, is fine
+    GuideSession quick = Quiet(300, 1.3);
+    CHECK_FALSE(Find(AssessAll(quick).improve, "Frames arrive every"));
+    s.hdr.Add("Dither = both axes, Dither scale = 1.000, Guide-frame time lapse = 2000, Server enabled");
+    CHECK_FALSE(Find(AssessAll(s).improve, "Frames arrive every"));
+}
+
+TEST_CASE("a guide star that fades through the stretch is flagged", "[assessment]")
+{
+    GuideSession s = Quiet();
+    for (size_t i = 0; i < s.entries.size(); i++)
+    {
+        s.entries[i].mass = (int) (400000 - 800 * i); // 400k down to 160k
+        s.entries[i].snr = (float) (58. - 0.07 * i);
+    }
+    Assessment a = AssessAll(s);
+    const Finding *f = Find(a.improve, "Guide star faded");
+    REQUIRE(f);
+    CHECK(Has(f->body, "dew"));
+
+    GuideSession steady = Quiet();
+    for (GuideEntry& e : steady.entries)
+        e.mass = 400000;
+    CHECK_FALSE(Find(AssessAll(steady).improve, "Guide star faded"));
+}
+
+TEST_CASE("Dec errors that stay put after Dec reverses suggest backlash", "[assessment]")
+{
+    // Dec pulses switch direction every 10 frames, and the error keeps its
+    // sign for 3 frames after each switch
+    GuideSession s = Session(300, 2., [](size_t) { return 0.; }, [](size_t i) {
+        size_t block = i / 10, k = i % 10;
+        double sign = block % 2 ? 1. : -1.;
+        return k < 3 ? -sign * 0.3 : sign * 0.3;
+    });
+    for (size_t i = 0; i < s.entries.size(); i++)
+        s.entries[i].decdur = (i / 10) % 2 ? -100 : 100;
+    Measurements m = Measure(s, 0, s.entries.size());
+    CHECK(m.decReversals >= 20);
+    CHECK(m.decStuck == m.decReversals);
+    const Finding *f = Find(AssessAll(s).improve, "Dec may have backlash");
+    CHECK(f);
+
+    // random Dec errors stay put after a reversal only now and then
+    Noise dec;
+    GuideSession random = Session(300, 2., [](size_t) { return 0.; }, [&](size_t) { return 0.3 * dec(); });
+    for (size_t i = 0; i < random.entries.size(); i++)
+        if (i % 3 == 0)
+            random.entries[i].decdur = random.entries[i].decraw > 0 ? -100 : 100;
+    CHECK_FALSE(Find(AssessAll(random).improve, "Dec may have backlash"));
+}
+
+TEST_CASE("likely Dec backlash raises the polar alignment threshold to 10 arc-minutes", "[assessment]")
+{
+    GuideSession s = Session(300, 2., [](size_t) { return 0.; }, [](size_t i) {
+        size_t block = i / 10, k = i % 10;
+        double sign = block % 2 ? 1. : -1.;
+        return k < 3 ? -sign * 0.3 : sign * 0.3;
+    });
+    for (size_t i = 0; i < s.entries.size(); i++)
+        s.entries[i].decdur = (i / 10) % 2 ? -100 : 100;
+    GuideStats stats = CalcStats(s, 0, s.entries.size());
+    stats.paerr = 7.;
+    CHECK_FALSE(Find(AssessAll(s, &stats).improve, "Polar alignment is"));
+}
+
+TEST_CASE("a saturated guide star is flagged", "[assessment]")
+{
+    GuideSession s = Quiet();
+    for (size_t i = 0; i < s.entries.size(); i += 10)
+        s.entries[i].err = 1; // 10% saturated, still found
+    Assessment a = AssessAll(s);
+    CHECK(Find(a.improve, "Guide star saturated"));
+    CHECK(Find(a.good, "Star held"));
+    CHECK_FALSE(Find(AssessAll(Quiet()).improve, "Guide star saturated"));
 }
