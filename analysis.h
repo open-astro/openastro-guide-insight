@@ -58,7 +58,10 @@ struct GARun
     GARun() : len(0), t(nullptr), rac(nullptr), decc(nullptr), nfft(0), fftx(nullptr), ffty(nullptr) { }
     ~GARun();
     static bool CanAnalyze(const GuideSession& session, size_t begin, size_t end);
-    void Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections);
+    // drift_correction removes a straight-line fit from RA and Dec before the
+    // drift plot and periodogram; turning it off shows the raw positions.
+    void Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections,
+                 bool drift_correction = true);
 };
 
 // The periodogram as CSV text: a header row, then period (s), amplitude (px)
