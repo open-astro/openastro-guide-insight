@@ -153,16 +153,40 @@ std::optional<double> TotalHpfRms(const std::string& info, double pixelScale)
     return std::nullopt;
 }
 
-std::optional<double> LastFloor(const GuideSession& s)
+// A Guiding Assistant result's "<key>=  0.21 px (...)" value, in pixels.
+double HpfPx(const std::string& info, const std::string& key)
 {
-    std::optional<double> floor;
+    size_t pos = info.find(key + "=");
+    return pos == std::string::npos ? 0. : Positive(info.substr(pos + key.size() + 1)).value_or(0.);
+}
+
+std::optional<SkyFloor> LastFloor(const GuideSession& s, bool same)
+{
+    std::optional<SkyFloor> floor;
     for (const InfoEntry& info : s.infos)
         if (std::optional<double> v = TotalHpfRms(info.info, s.pixelScale))
-            floor = v;
+            floor = SkyFloor{ *v, same, HpfPx(info.info, "RA HPF-RMS"), HpfPx(info.info, "Dec HPF-RMS") };
     return floor;
 }
 
 } // namespace
+
+MountKind KindOfMount(const std::string& name)
+{
+    wxString n = wxString::FromUTF8(name).Upper();
+    static const char *const strainWave[] = { "HAE", "HEM", "AM3", "AM5", "RST-", "NYX-", "WAVE 100", "WAVE 150",
+                                              "HARMONIC", "STRAIN WAVE", "ZWO AM" };
+    static const char *const geared[] = { "EQ6", "EQ8", "EQ5", "EQ3", "HEQ5", "AZ-EQ", "EQM-35", "CEM", "GEM", "CGX",
+                                          "CGEM", "AVX", "LOSMANDY", "G11", "PARAMOUNT", "MACH1", "MACH2", "IEXOS",
+                                          "EXOS", "10MICRON", "EQ-R" };
+    for (const char *k : strainWave)
+        if (n.Contains(k))
+            return MountKind::StrainWave;
+    for (const char *k : geared)
+        if (n.Contains(k))
+            return MountKind::Geared;
+    return MountKind::Unknown;
+}
 
 ImagingTrain ImagingTrainFrom(const wxArrayString& hdr)
 {
@@ -194,8 +218,8 @@ ImagingTrain ImagingTrainFrom(const wxArrayString& hdr)
 
 std::optional<SkyFloor> SkyFloorFor(const GuideLog& log, const GuideSession& session)
 {
-    if (std::optional<double> own = LastFloor(session))
-        return SkyFloor{ *own, true };
+    if (std::optional<SkyFloor> own = LastFloor(session, true))
+        return own;
 
     // the latest result in an earlier session
     for (size_t i = 0; i < log.sessions.size(); i++)
@@ -203,8 +227,8 @@ std::optional<SkyFloor> SkyFloorFor(const GuideLog& log, const GuideSession& ses
         if (&log.sessions[i] != &session)
             continue;
         for (size_t j = i; j-- > 0;)
-            if (std::optional<double> earlier = LastFloor(log.sessions[j]))
-                return SkyFloor{ *earlier, false };
+            if (std::optional<SkyFloor> earlier = LastFloor(log.sessions[j], false))
+                return earlier;
         break;
     }
     return std::nullopt;
@@ -242,7 +266,10 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         if (e.mount != MOUNT)
             continue;
         if (e.radur)
+        {
             raPulses++;
+            (e.radur > 0 ? m.east : m.west)++;
+        }
         if (e.decdur)
         {
             decPulses++;
@@ -299,6 +326,28 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         std::string line = Line(wxln);
         if (StartsWith(line, "Exposure = "))
             m.exposure = Positive(line.substr(11)).value_or(0.) / 1000.;
+        else if (StartsWith(line, "Mount = "))
+            m.mount = line;
+        else if (StartsWith(line, "Max RA duration = "))
+            m.decGuideMode = Setting(line, "DEC guide mode");
+        else if (StartsWith(line, "RA Guide Speed = "))
+        {
+            m.guideSpeedRa = Positive(Setting(line, "RA Guide Speed")).value_or(0.);
+            m.guideSpeedDec = Positive(Setting(line, "Dec Guide Speed")).value_or(0.);
+            m.calDec = Leading(Setting(line, "Cal Dec")).value_or(NAN);
+        }
+        else if (StartsWith(line, "Norm rates RA = "))
+        {
+            m.calRateRa = Positive(line.substr(16)).value_or(0.);
+            size_t decAt = line.find(", Dec = ");
+            if (decAt != std::string::npos)
+                m.calRateDec = Positive(line.substr(decAt + 8)).value_or(0.);
+            size_t ortho = line.find("ortho.err. = ");
+            if (ortho != std::string::npos)
+                m.orthoError = Leading(line.substr(ortho + 13)).value_or(-1.);
+        }
+        else if (StartsWith(line, "Pixel scale = "))
+            m.binning = (int) Positive(Setting(line, "Binning")).value_or(0.);
         else if (StartsWith(line, "Dither = "))
             m.timeLapse = Leading(Setting(line, "Guide-frame time lapse")).value_or(0.) / 1000.;
         else if (StartsWith(line, "X guide algorithm = "))
@@ -313,6 +362,8 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
             m.dec = Leading(Setting(line, "Dec")).value_or(NAN);
     }
 
+    std::vector<double> ditherSizes, settleTimes;
+    double settleStart = NAN; // when the current settling started, NaN when none
     for (const InfoEntry& info : session.infos)
     {
         if (info.idx >= (int) end)
@@ -323,10 +374,31 @@ Measurements Measure(const GuideSession& session, size_t begin, size_t end)
         if (info.idx < (int) begin)
             continue;
         if (StartsWith(info.info, "DITHER"))
+        {
             m.dithers++;
+            // "DITHER by 4.116, -3.024"
+            std::optional<double> dx = Leading(info.info.substr(std::min<size_t>(10, info.info.size())));
+            size_t comma = info.info.find(", ");
+            std::optional<double> dy = comma == std::string::npos ? std::nullopt : Leading(info.info.substr(comma + 2));
+            if (dx && dy)
+                ditherSizes.push_back(hypot(*dx, *dy));
+        }
         else if (StartsWith(info.info, "Settling failed"))
             m.unsettled++;
+        double at = entries.empty() ? 0. : entries[std::min<size_t>(info.idx, entries.size() - 1)].dt;
+        if (StartsWith(info.info, "Settling started"))
+            settleStart = at;
+        else if (StartsWith(info.info, "Settling complete") && !isnan(settleStart))
+        {
+            settleTimes.push_back(at - settleStart);
+            settleStart = NAN;
+        }
     }
+
+    if (!ditherSizes.empty())
+        m.ditherSize = median(ditherSizes);
+    if (!settleTimes.empty())
+        m.settleTime = median(settleTimes);
 
     // the best and worst 5 minutes, over full windows only
     const double window = 300.;
@@ -477,6 +549,15 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
     const bool backlash = m.decReversals >= 10 && m.decStuck >= 0.5 * m.decReversals;
     const double overhead = m.cadence - m.exposure - m.timeLapse;
     const bool slowLoop = m.exposure > 0. && m.cadence > 0. && overhead > 1. && overhead > m.exposure;
+    const MountKind kind = KindOfMount(m.mount);
+    const std::optional<SkyFloor> sky = SkyFloorFor(log, session);
+    // PHD2's Guiding Assistant minimum moves, from the measured Dec noise
+    double raRec = 0., decRec = 0.;
+    if (sky && sky->decPx > 0.)
+    {
+        decRec = std::max(0.1, sky->decPx * (scale < 1.5 ? 1.28 : 1.65));
+        raRec = std::max(0.1, decRec * 0.65);
+    }
     const std::string raPulses = "RA pulses on " + Percent(m.raPulsed) + " of frames";
 
     // RA: does it overshoot, lag, or chase noise?
@@ -523,6 +604,16 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                          "At SNR " + Fixed(m.medianSnr, 0) + " the star's position is hard to measure, so guiding "
                          "reacts to measurement noise. Pick a brighter star or lengthen the exposure."));
 
+    if (scale > 0. && scale < 0.5 && m.binning == 1)
+    {
+        Finding f = Note("Bin the guide camera",
+                         "Each guide pixel covers only " + Fixed(scale, 2) + ARCSEC + ", smaller than guiding needs. "
+                         "Binning makes the star brighter and faster to read, with no loss of accuracy (PHD2's "
+                         "Guiding Assistant suggests the same).");
+        f.changes.push_back(Change{ "Guide camera binning", "1", std::to_string((int) ceil(0.5 / scale - 1e-9)) });
+        improve(f);
+    }
+
     if (m.frames > 0 && m.saturated > 0.05 * m.frames)
         improve(Note("Guide star saturated",
                      "The star was saturated on " + std::to_string(m.saturated) + " of " + std::to_string(m.frames) +
@@ -535,6 +626,50 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                      "By the end, the star was " + Percent(m.lastMass / m.firstMass) + " as bright as at the start" +
                      snrs + ". Dew on the guide scope, haze, or the star sinking lower in the sky can do this. Check "
                      "for dew, or pick a star higher in the sky."));
+    }
+
+    const double sidereal = 15.04;
+    if (m.guideSpeedRa > 0. && m.guideSpeedRa < 0.45 * sidereal)
+    {
+        Finding f = Note("Guide speed is slow",
+                         "The mount guides at " + Fixed(m.guideSpeedRa / sidereal, 2) + "\u00d7 sidereal, so every "
+                         "correction takes a long pulse and big errors take long to recover. Most mounts guide best "
+                         "at 0.5\u20130.9\u00d7. Recalibrate after changing it.");
+        f.changes.push_back(Change{ "Guide speed", Fixed(m.guideSpeedRa / sidereal, 2) + "\u00d7 sidereal",
+                                    "0.5\u20130.9\u00d7 sidereal" });
+        improve(f);
+    }
+
+    auto offRate = [](double measured, double speed) {
+        return measured > 0. && speed > 0. && (measured < 0.5 * speed || measured > 1.5 * speed);
+    };
+    if (offRate(m.calRateRa, m.guideSpeedRa) || offRate(m.calRateDec, m.guideSpeedDec))
+        improve(Note("Calibration doesn't match the guide speed",
+                     "Calibration measured the mount moving " + Fixed(m.calRateRa, 1) + ARCSEC + "/s in RA and " +
+                     Fixed(m.calRateDec, 1) + ARCSEC + "/s in Dec, but it reports a guide speed of " +
+                     Fixed(m.guideSpeedRa, 1) + ARCSEC + "/s. Check the guide speed set in the mount or its driver, "
+                     "and that the clutches aren't slipping; then recalibrate."));
+
+    // the calibration this session used: the last one before it in the log
+    const Calibration *cal = nullptr;
+    for (const Calibration& c : log.calibrations)
+        if (c.starts.IsValid() && session.starts.IsValid() && c.starts <= session.starts)
+            cal = &c;
+    if (cal)
+    {
+        int west = 0, north = 0;
+        for (const CalibrationEntry& e : cal->entries)
+        {
+            if (e.direction == WEST)
+                west++;
+            else if (e.direction == NORTH)
+                north++;
+        }
+        if ((west > 0 && west < 8) || (north > 0 && north < 8))
+            improve(Note("Calibration was short",
+                         "Calibration took " + std::to_string(west) + " steps west and " + std::to_string(north) +
+                         " north; PHD2 aims for about 12. With fewer steps the rates are measured less precisely. "
+                         "Use PHD2's calibration step calculator to pick a smaller step, then recalibrate."));
     }
 
     const double maxDur = session.mount.xlim.maxDur;
@@ -572,6 +707,24 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
         good("Calibration is current", body + ".");
     }
 
+    size_t raPulseCount = m.east + m.west;
+    if (raPulseCount >= 50 && std::max(m.east, m.west) >= 0.8 * raPulseCount)
+    {
+        bool east = m.east > m.west;
+        std::string body = "PHD2 pushed RA " + std::string(east ? "east" : "west") + " on " +
+                           Percent((double) std::max(m.east, m.west) / raPulseCount) + " of its RA pulses, so "
+                           "something keeps pulling the star the other way: polar alignment, a tracking rate that's "
+                           "slightly off";
+        if (kind == MountKind::StrainWave)
+            body += ". Strain-wave mounts carry no counterweight, so weight isn't the cause.";
+        else
+            body += ", or the mount's balance. A slightly east-heavy balance is fine; a big imbalance strains the "
+                    "gears.";
+        body += " Steady one-way pulses are guiding doing its job; they're only a problem when they get long.";
+        improve(Note("RA is pushed mostly one way", body,
+                     std::to_string(m.east) + " east, " + std::to_string(m.west) + " west"));
+    }
+
     double span = end > begin && end <= session.entries.size() ?
         session.entries[end - 1].dt - session.entries[begin].dt : 0.;
     if (span >= 300. && stats.paerr > 0.)
@@ -604,6 +757,9 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
         body += " Longer exposures average the seeing out, leaving less to chase.";
         if (slowLoop)
             body += " With frames this slow, a longer exposure barely slows guiding.";
+        if (kind == MountKind::StrainWave)
+            body += " Strain-wave mounts like this one have fast periodic error: if the Frequency chart then shows "
+                    "peaks under 30 s, go back to a shorter exposure.";
         Finding f = Note("RA is correcting noise", body, corr + " \u00b7 " + raPulses);
         f.changes.push_back(Change{ "Exposure", Fixed(m.exposure, 1) + " s", "2\u20134 s" });
         if (m.raMinMove > 0. && m.raMinMove < 0.2)
@@ -624,7 +780,34 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                    "Dec pulses on " + Percent(m.decPulsed) + " of frames");
         if (m.decMinMove > 0.)
             f.changes.push_back(Change{ "Dec minimum move", Fixed(m.decMinMove, 2) + " px",
-                                        Fixed(std::max(0.2, UpToTwentieth(m.decMinMove * 1.5)), 2) + " px" });
+                                        Fixed(decRec > 0. ? decRec :
+                                                  std::max(0.2, UpToTwentieth(m.decMinMove * 1.5)), 2) + " px" });
+        improve(f);
+    }
+
+    auto far = [](double current, double rec) { return current > 0. && rec > 0. && fabs(current - rec) > 0.4 * rec; };
+    if (far(m.raMinMove, raRec) || far(m.decMinMove, decRec))
+    {
+        Finding f = Note("Minimum move doesn't match the measured noise",
+                         "The Guiding Assistant measured how much the star jumps around on its own: " +
+                         Fixed(sky->raPx, 2) + " px in RA and " + Fixed(sky->decPx, 2) + " px in Dec. PHD2 sets the "
+                         "minimum move from that, so guiding ignores the jumps but still catches real drift.");
+        f.changes.push_back(Change{ "RA minimum move", Fixed(m.raMinMove, 2) + " px", Fixed(raRec, 2) + " px" });
+        f.changes.push_back(Change{ "Dec minimum move", Fixed(m.decMinMove, 2) + " px", Fixed(decRec, 2) + " px" });
+        improve(f);
+    }
+
+    size_t decPulseCount = m.north + m.south;
+    if (decPulseCount >= 20 && std::max(m.north, m.south) >= 0.9 * decPulseCount && m.decGuideMode == "Auto")
+    {
+        bool north = m.north > m.south;
+        Finding f = Note("Dec only needs pushing one way",
+                         "All but " + std::to_string(std::min(m.north, m.south)) + " of " +
+                         std::to_string(decPulseCount) + " Dec pulses went " + (north ? "north" : "south") +
+                         ": Dec drifts steadily one way. Guiding Dec in that direction only stops noise pushing it "
+                         "back and forth, and sidesteps Dec backlash.",
+                         std::to_string(m.north) + " north, " + std::to_string(m.south) + " south");
+        f.changes.push_back(Change{ "Dec guide mode", "Auto", north ? "North" : "South" });
         improve(f);
     }
 
@@ -637,6 +820,27 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                      "guide Dec in that direction only; otherwise try backlash compensation.",
                      std::to_string(m.decStuck) + " of " + std::to_string(m.decReversals) + " Dec reversals"));
 
+    if (m.ditherSize > 0. && train.pixelScale)
+    {
+        double pixels = m.ditherSize * scale / *train.pixelScale;
+        std::string size = "Dithers moved about " + Fixed(pixels, 0) + " imaging pixels";
+        if (pixels < 3.)
+            improve(Note("Dithers are small",
+                         size + ", too little to break up the patterns noise leaves when frames are stacked. Raise "
+                         "the dither amount in your imaging app to move at least 3\u20135 pixels."));
+        else if (pixels > 25.)
+            improve(Note("Dithers are bigger than needed",
+                         size + ". 5\u201310 pixels is enough; bigger dithers take longer to settle and cost imaging "
+                         "time."));
+        else
+            good("Dither size", size + ".");
+    }
+    if (m.settleTime && *m.settleTime > 30.)
+        improve(Note("Dithers take long to settle",
+                     "Settling took " + Fixed(*m.settleTime, 0) + " s after each dither (the median), time lost from "
+                     "imaging. A smaller dither, a wider settle tolerance in your imaging app, or a higher aggression "
+                     "helps."));
+
     if (m.dithers > 0)
     {
         if (m.unsettled > 0)
@@ -645,8 +849,9 @@ Assessment Assess(const GuideLog& log, const GuideSession& session, size_t begin
                              "Give settling more time or a wider tolerance in your imaging app, or look at what "
                              "happened after those dithers on the timeline."));
         else
-            good("Dithers settled", std::to_string(m.dithers) + (m.dithers == 1 ? " dither, settled." :
-                                                                   " dithers, all settled."));
+            good("Dithers settled", std::to_string(m.dithers) + (m.dithers == 1 ? " dither, settled" :
+                                                                   " dithers, all settled") +
+                                    (m.settleTime ? " in about " + Fixed(*m.settleTime, 0) + " s" : std::string()) + ".");
     }
 
     if (m.worst && m.worstWindow >= 1.4 * m.bestWindow)
