@@ -5,6 +5,7 @@ All notable changes to OpenAstro Guide Insight, and to PHD2 Log Viewer before it
 ## Unreleased
 
 - Renamed from PHD2 Log Viewer; settings carry over
+- New app icon: RA and Dec guide traces settling into the OpenAstro logo
 - New window: a sidebar of sessions, the chart, and an inspector of statistics, session details, display, analysis and exclusion options
 - The chart switches between Timeline, Scatter, Drift and Frequency; the separate analysis window is gone
 - Timeline: drag to select frames and see their statistics; scroll, pinch and an overview strip to move around; a time axis option; hover for any frame's details
