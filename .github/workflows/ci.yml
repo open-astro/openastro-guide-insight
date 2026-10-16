@@ -5,6 +5,8 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  # the release workflow builds every platform with these same jobs
+  workflow_call:
 
 permissions:
   contents: read
@@ -64,6 +66,10 @@ jobs:
       - name: Install
         # the base preset's install folder would override the linux preset's /usr
         run: DESTDIR=${{ github.workspace }}/stage cmake --install out/build/linux --prefix /usr
+
+      - name: Check the release notes script
+        if: matrix.arch == 'x86_64'
+        run: scripts/check-release-notes.sh
 
       - name: Package AppImage
         run: |
