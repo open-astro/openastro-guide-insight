@@ -37,6 +37,11 @@ public:
     virtual Document& Doc() = 0;
     virtual const AppSettings& Settings() const = 0;
     virtual const Palette& Colors() const = 0;
+    // The Drift and Frequency analysis of the selection or the whole
+    // session, or null when there are too few frames.
+    virtual const GARun *Analysis() = 0;
+    // Changes whenever Analysis() is worked out again.
+    virtual unsigned AnalysisGeneration() const = 0;
 
     // Frames were included or excluded.
     virtual void FramesChanged() = 0;

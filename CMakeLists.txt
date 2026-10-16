@@ -93,32 +93,6 @@ endif()
 find_package(GSL REQUIRED)
 
 #################################################################################
-# wxFormBuilder generated UI code
-
-option(HAVE_WXFB "Regenerate the UI code from phdlogview.fbp with wxFormBuilder" OFF)
-
-set(FBSRC
-  ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp
-  ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h
-)
-
-if(HAVE_WXFB)
-  find_program(WXFB NAMES wxformbuilder wxFormBuilder
-    PATHS "C:/Program Files/wxFormBuilder" "C:/Program Files (x86)/wxFormBuilder"
-          "/Applications/wxFormBuilder.app/Contents/MacOS"
-    REQUIRED)
-  add_custom_command(
-    OUTPUT ${FBSRC}
-    COMMAND ${WXFB} -g ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/phdlogview.fbp
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  )
-else()
-  configure_file(generated/LogViewFrameBase.cpp ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.cpp COPYONLY)
-  configure_file(generated/LogViewFrameBase.h ${CMAKE_CURRENT_BINARY_DIR}/LogViewFrameBase.h COPYONLY)
-endif()
-
-#################################################################################
 # Application
 
 # Parser and analysis code, independent of the GUI so it can be unit tested.
@@ -172,6 +146,10 @@ set(SRC
   ChartHost.h
   ChartView.cpp
   ChartView.h
+  DriftCanvas.cpp
+  DriftCanvas.h
+  FrequencyCanvas.cpp
+  FrequencyCanvas.h
   icons.cpp
   icons.h
   Inspector.cpp
@@ -204,7 +182,6 @@ endif()
 
 add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC})
 
-target_include_directories(guideinsight PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(guideinsight PRIVATE guideinsight_core)
 guideinsight_warnings(guideinsight)
 

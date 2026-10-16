@@ -20,6 +20,8 @@
 #include "ChartView.h"
 
 #include "CalibrationCanvas.h"
+#include "DriftCanvas.h"
+#include "FrequencyCanvas.h"
 #include "OverviewScrubber.h"
 #include "ScatterCanvas.h"
 #include "TimelineCanvas.h"
@@ -111,10 +113,14 @@ ChartView::ChartView(wxWindow *parent, ChartHost& host)
     m_timeline = new TimelineCanvas(m_book, host);
     m_scatter = new ScatterCanvas(m_book, host);
     m_calibration = new CalibrationCanvas(m_book, host);
+    m_drift = new DriftCanvas(m_book, host);
+    m_frequency = new FrequencyCanvas(m_book, host);
     m_book->AddPage(m_message, "Message");
     m_book->AddPage(m_timeline, "Timeline");
     m_book->AddPage(m_scatter, "Scatter");
     m_book->AddPage(m_calibration, "Calibration");
+    m_book->AddPage(m_drift, "Drift");
+    m_book->AddPage(m_frequency, "Frequency");
     sizer->Add(m_book, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
 
     sizer->AddSpacer(FromDIP(10));
@@ -167,46 +173,43 @@ void ChartView::ShowMessage(const wxString& message, const wxString& hint)
 {
     m_messageText = message;
     m_hint = hint;
-    m_book->ChangeSelection(0);
-    m_message->Refresh();
-    if (m_overview->IsShown())
+    ShowPage(0, false);
+}
+
+void ChartView::ShowPage(int page, bool overview)
+{
+    m_book->ChangeSelection(page);
+    if (m_overview->IsShown() != overview)
     {
-        m_overview->Hide();
+        m_overview->Show(overview);
         Layout();
     }
+    RefreshChart();
 }
 
 void ChartView::ShowTimeline()
 {
-    m_book->ChangeSelection(1);
-    if (!m_overview->IsShown())
-    {
-        m_overview->Show();
-        Layout();
-    }
-    RefreshChart();
+    ShowPage(1, true);
 }
 
 void ChartView::ShowScatter()
 {
-    m_book->ChangeSelection(2);
-    if (m_overview->IsShown())
-    {
-        m_overview->Hide();
-        Layout();
-    }
-    RefreshChart();
+    ShowPage(2, false);
 }
 
 void ChartView::ShowCalibration()
 {
-    m_book->ChangeSelection(3);
-    if (m_overview->IsShown())
-    {
-        m_overview->Hide();
-        Layout();
-    }
-    RefreshChart();
+    ShowPage(3, false);
+}
+
+void ChartView::ShowDrift()
+{
+    ShowPage(4, false);
+}
+
+void ChartView::ShowFrequency()
+{
+    ShowPage(5, false);
 }
 
 Chart *ChartView::ActiveChart() const
@@ -231,5 +234,5 @@ void ChartView::ApplyPalette()
 
 std::vector<wxWindow *> ChartView::DropTargets() const
 {
-    return { m_message, m_timeline, m_scatter, m_calibration };
+    return { m_message, m_timeline, m_scatter, m_calibration, m_drift, m_frequency };
 }
