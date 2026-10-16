@@ -79,6 +79,16 @@ struct SummaryText
 };
 SummaryText Summarize(const GuideStats& stats, size_t frames, double pixelScale, Units units);
 
+// The status line for the frame under the pointer:
+// "07:14:45 · frame 53 · RA −0.03″ · Dec 0.12″ · pulse RA 120 ms W · SNR 52.1 · mass 30411".
+// It also notes a saturated star, a lost star, an excluded frame and the
+// frame's event, if any.
+std::string HoverText(const GuideSession& session, size_t frame, Units units, bool raDecAxes);
+
+// The chart's subtitle for a view of a session from t0 to t1 seconds:
+// "Whole session" or "07:18 – 07:30 of 27 min".
+std::string VisibleRange(const GuideSession& session, double t0, double t1);
+
 // The statistics as CSV, for the clipboard.
 std::string StatsCsv(const GuideStats& stats, double pixelScale);
 

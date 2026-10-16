@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdlib>
 #include <math.h>
 
 static const char *const MINUS = "−";
@@ -166,6 +167,71 @@ SummaryText Summarize(const GuideStats& stats, size_t frames, double pixelScale,
     s.decDrift = Drift(stats.drift_dec, pixelScale, units);
     s.paError = Fixed(stats.paerr, 1) + "′";
     return s;
+}
+
+static std::string ClockAt(const GuideSession& s, double t)
+{
+    if (!s.starts.IsValid())
+        return Fixed(t, 1) + " s";
+    return (s.starts + wxTimeSpan::Milliseconds(llround(t * 1000.))).Format("%H:%M:%S").ToStdString();
+}
+
+// "120 ms W": a pulse's length and direction, from its signed duration.
+static std::string Pulse(int duration, bool ao, const char *positive, const char *negative)
+{
+    return std::to_string(std::abs(duration)) + (ao ? " steps " : " ms ") + (duration > 0 ? positive : negative);
+}
+
+std::string HoverText(const GuideSession& session, size_t frame, Units units, bool raDecAxes)
+{
+    const GuideEntry& e = session.entries[frame];
+    std::string s = ClockAt(session, e.dt) + DOT + "frame " + std::to_string(e.frame);
+    auto add = [&s](const std::string& part) { s += DOT + part; };
+
+    if (!StarWasFound(e.err))
+        add("star lost");
+    else
+    {
+        double ps = session.pixelScale;
+        if (raDecAxes)
+        {
+            add("RA " + Distance(e.raraw, ps, units));
+            add("Dec " + Distance(e.decraw, ps, units));
+        }
+        else
+        {
+            add("dx " + Distance(e.dx, ps, units));
+            add("dy " + Distance(e.dy, ps, units));
+        }
+
+        std::string pulses;
+        bool ao = e.mount == AO;
+        if (e.radur)
+            pulses = "RA " + Pulse(e.radur, ao, "W", "E");
+        if (e.decdur)
+            pulses += (pulses.empty() ? "Dec " : ", Dec ") + Pulse(e.decdur, ao, "N", "S");
+        if (!pulses.empty())
+            add((ao ? "AO " : "pulse ") + pulses);
+
+        add("SNR " + Fixed(e.snr, 1));
+        add("mass " + std::to_string(e.mass));
+        if (e.err == 1)
+            add("saturated");
+        if (!e.included)
+            add("excluded");
+    }
+    if (!e.info.empty())
+        add(e.info);
+    return s;
+}
+
+std::string VisibleRange(const GuideSession& session, double t0, double t1)
+{
+    const auto& entries = session.entries;
+    // within half a second of each end counts as the whole session
+    if (entries.empty() || (t0 <= entries.front().dt + 0.5 && t1 >= entries.back().dt - 0.5))
+        return "Whole session";
+    return ClockAt(session, t0) + " \u2013 " + ClockAt(session, t1) + " of " + Duration(session.duration);
 }
 
 std::string StatsCsv(const GuideStats& stats, double pixelScale)
