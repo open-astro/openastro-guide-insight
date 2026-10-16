@@ -59,6 +59,8 @@ if(APPLE)
   add_test(NAME macos_app_has_an_icns_icon
     COMMAND sh -c "icon=$(plutil -extract CFBundleIconFile raw \"$1/Info.plist\") && case $icon in *.icns) ;; *) icon=$icon.icns ;; esac && file \"$1/Resources/$icon\" | grep -q 'Mac OS X icon'"
       _ $<TARGET_BUNDLE_CONTENT_DIR:guideinsight>)
+  add_test(NAME app_prints_its_version
+    COMMAND sh -c "test \"$(\"$1\" --version)\" = \"OpenAstro Guide Insight ${PROJECT_VERSION}\"" _ $<TARGET_FILE:guideinsight>)
   add_test(NAME macos_app_minimum_is_26
     COMMAND sh -c "vtool -show-build \"$1\" | grep -q -E 'minos 26\\.0$'" _ $<TARGET_FILE:guideinsight>)
 endif()
