@@ -1,5 +1,5 @@
 /*
- * This file is part of phdlogview
+ * This file is part of OpenAstro Guide Insight, a fork of PHD2 Log Viewer
  *
  * Copyright (C) 2016 Andy Galasso
  *

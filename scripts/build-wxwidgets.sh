@@ -28,11 +28,11 @@ echo "$sha512  $work/wx.tar.gz" | sha512sum -c -
 mkdir "$work/src"
 tar -xzf "$work/wx.tar.gz" -C "$work/src" --strip-components=1
 
-# Static wxWidgets libraries with only what phdlogview needs. GitHub's source
+# Static wxWidgets libraries with only what OpenAstro Guide Insight needs. GitHub's source
 # archive omits wxWidgets' bundled third-party submodules, so image, regex,
 # zlib and XML support come from system packages (libpcre2-dev, zlib1g-dev,
 # libpng-dev, libjpeg-dev, libtiff-dev, libexpat1-dev). NanoSVG is only
-# available bundled, and phdlogview does not use SVG, so it is off.
+# available bundled, and the app does not use SVG, so it is off.
 cmake -S "$work/src" -B "$work/build" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$prefix" \
