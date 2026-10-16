@@ -86,13 +86,15 @@ void Document::ResetViews()
         m_views.push_back(SessionView{ NewViewport(s.entries, m_axis), VerticalView() });
 }
 
-bool Document::Load(std::istream& is)
+bool Document::Load(std::istream& is, const std::function<void()>& progress)
 {
     if (!is)
         return false;
 
     GuideLog log;
-    LogParser().Parse(is, log);
+    LogParser parser;
+    parser.progress = progress;
+    parser.Parse(is, log);
     m_log = std::move(log);
 
     for (auto& s : m_log.sessions)
@@ -176,6 +178,15 @@ void Document::IncludeSelection(bool include)
         IncludeFrames(*s, *m_selection, include);
     else
         IncludeRange(s->entries, include);
+    s->CalcStats();
+}
+
+void Document::IncludeAll(bool include)
+{
+    GuideSession *s = Session();
+    if (!s)
+        return;
+    IncludeRange(s->entries, include);
     s->CalcStats();
 }
 

@@ -139,6 +139,10 @@ add_library(guideinsight_core STATIC
   selection.h
   document.cpp
   document.h
+  labels.cpp
+  labels.h
+  appsettings.cpp
+  appsettings.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
@@ -154,19 +158,33 @@ if(MSVC)
 endif()
 
 set(SRC
-  AnalysisWin.cpp
-  AnalysisWin.h
+  ChartView.cpp
+  ChartView.h
+  icons.cpp
+  icons.h
+  Inspector.cpp
+  Inspector.h
   LogViewApp.cpp
   LogViewApp.h
-  LogViewFrame.cpp
-  LogViewFrame.h
+  MainFrame.cpp
+  MainFrame.h
+  SectionHeader.cpp
+  SectionHeader.h
+  Preferences.cpp
+  Preferences.h
+  SegmentedControl.cpp
+  SegmentedControl.h
+  SessionSidebar.cpp
+  SessionSidebar.h
+  theme.cpp
+  theme.h
 )
 
 if(WIN32)
   list(APPEND SRC openastro-guide-insight.rc)
 endif()
 
-add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC} ${FBSRC})
+add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC})
 
 target_include_directories(guideinsight PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(guideinsight PRIVATE guideinsight_core)
