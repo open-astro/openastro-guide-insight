@@ -1,0 +1,59 @@
+name: Release
+
+# Pushing a tag such as v0.7.0 builds and tests every platform, then
+# publishes a GitHub Release with the packages, their SHA-256 checksums and
+# the version's notes from CHANGELOG.md.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag matches the project version
+        run: |
+          version=$(sed -n 's/^project(guideinsight VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the project version $version"
+            exit 1
+          fi
+          scripts/release-notes.sh "$version" >/dev/null
+
+  build:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: openastro-guide-insight-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          scripts/release-notes.sh "$version" > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "OpenAstro Guide Insight $version" --notes-file notes.md
