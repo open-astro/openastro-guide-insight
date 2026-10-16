@@ -226,3 +226,76 @@ TEST_CASE("Frequency analysis CSV uses a decimal point in every locale", "[analy
     std::getline(first, line);
     CHECK(line.find('.') != std::string::npos);
 }
+
+namespace {
+
+// A session of n frames with guide output on or off for each frame
+// ('g' = guided, 'u' = unguided), optional header lines and infos.
+GuideSession Labelled(const std::string& guided, std::initializer_list<const char *> hdr = {},
+                      std::initializer_list<const char *> infos = {})
+{
+    GuideSession s("2026-01-01 00:00:00");
+    for (size_t i = 0; i < guided.size(); i++)
+    {
+        GuideEntry e = MakeEntry((int) i + 1, 2. * i, 0., 0.);
+        e.guiding = guided[i] == 'g';
+        s.entries.push_back(e);
+    }
+    for (const char *h : hdr)
+        s.hdr.Add(h);
+    for (const char *text : infos)
+    {
+        InfoEntry ie;
+        ie.idx = (int) s.entries.size();
+        ie.repeats = 1;
+        ie.info = text;
+        s.infos.push_back(ie);
+    }
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("Ordinary guiding is labelled Guiding", "[sections]")
+{
+    CHECK(SessionLabel(Labelled("gggg", { "Max RA duration = 2500, Max DEC duration = 2500, DEC guide mode = Auto" })) ==
+          "Guiding");
+}
+
+TEST_CASE("A Guiding Assistant run is labelled", "[sections]")
+{
+    // Upstream issue #7. GA turns guide output off and logs its results.
+    auto ga = Labelled("uuuu", {}, { "GA Result - Dec Drift Rate=0.3 a-s/min, Dec Peak=1.2 a-s, PA Error=2.1 a-m" });
+    CHECK(SessionLabel(ga) == "Guiding Assistant");
+}
+
+TEST_CASE("Guiding that includes a Guiding Assistant run is labelled", "[sections]")
+{
+    auto mixed = Labelled("gguuuugg", {}, { "GA Result - RA Peak=3.1 a-s" });
+    CHECK(SessionLabel(mixed) == "Guiding + GA");
+}
+
+TEST_CASE("A session with guide output off throughout is labelled Unguided", "[sections]")
+{
+    CHECK(SessionLabel(Labelled("uuu")) == "Unguided");
+}
+
+TEST_CASE("A session with Dec guiding off is labelled RA only", "[sections]")
+{
+    // Drift alignment turns Dec guiding off. PHD2 only records which
+    // drift-align phase it was in the debug log, so Alt/Az can't be shown.
+    auto raOnly = Labelled("gggg", { "Max RA duration = 2500, Max DEC duration = 2500, DEC guide mode = Off" });
+    CHECK(SessionLabel(raOnly) == "Guiding, RA only");
+}
+
+TEST_CASE("A session with no frames is labelled Guiding", "[sections]")
+{
+    CHECK(SessionLabel(Labelled("")) == "Guiding");
+}
+
+TEST_CASE("The real log's sessions are ordinary guiding", "[sections]")
+{
+    GuideLog log = LoadRealLog();
+    CHECK(SessionLabel(log.sessions[0]) == "Guiding");
+    CHECK(SessionLabel(log.sessions[1]) == "Guiding");
+}

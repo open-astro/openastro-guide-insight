@@ -65,4 +65,9 @@ struct GARun
 // and amplitude (arc-seconds) per row.
 std::string FftCsv(const GARun& ga);
 
+// What kind of run a guiding section was, for the log's table of contents:
+// "Guiding", "Guiding Assistant", "Guiding + GA", "Unguided" or
+// "Guiding, RA only".
+std::string SessionLabel(const GuideSession& session);
+
 #endif
