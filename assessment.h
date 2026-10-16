@@ -52,6 +52,7 @@ struct SkyFloor
 {
     double total;       // arc-seconds, RA and Dec combined
     bool sameSession;   // measured in the session being assessed
+    double raPx = 0., decPx = 0.; // each axis, guide pixels; 0 when not logged
 };
 // The floor from the session's own Guiding Assistant result, or else the
 // latest one earlier in the log.
@@ -91,10 +92,25 @@ struct Measurements
     std::optional<IndexRun> worst;
     size_t dithers = 0, unsettled = 0;
     size_t worstDithers = 0;    // dithers during the worst window
+    size_t east = 0, west = 0;  // RA pulses each way
+    std::string mount;          // the header's Mount line
+    std::string decGuideMode;   // "Auto", "North", "South", ...
+    double guideSpeedRa = 0., guideSpeedDec = 0.; // arc-seconds per second
+    double calRateRa = 0., calRateDec = 0.;       // calibrated, arc-seconds per second at Dec 0
+    int binning = 0;            // guide camera
+    double ditherSize = 0.;     // median dither, guide pixels
+    std::optional<double> settleTime; // median seconds from settling started to complete
     // From "INFO: CONDITIONS" lines during the worst window, when any.
     std::optional<double> worstWind;   // m/s, the highest gust or speed
 };
 Measurements Measure(const GuideSession& session, size_t begin, size_t end);
+
+// Strain-wave (harmonic) mounts have fast periodic error and no
+// counterweight; geared (worm) mounts have slower periodic error and need
+// balancing.
+enum class MountKind { Unknown, StrainWave, Geared };
+// The kind of mount, from its name or the header's Mount line.
+MountKind KindOfMount(const std::string& name);
 
 enum class Verdict { Excellent, Good, Fair, Poor, Unknown };
 
