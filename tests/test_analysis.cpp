@@ -299,3 +299,18 @@ TEST_CASE("The real log's sessions are ordinary guiding", "[sections]")
     CHECK(SessionLabel(log.sessions[0]) == "Guiding");
     CHECK(SessionLabel(log.sessions[1]) == "Guiding");
 }
+
+TEST_CASE("Drift correction can be turned off", "[analysis]")
+{
+    // Upstream issue #10. 0.05 px/s of drift over 960 s is 48 px.
+    GuideSession s = SineSession(481, 120., 2., 0.05);
+
+    GARun corrected;
+    corrected.Analyze(s, 0, s.entries.size(), false);
+    CHECK(fabs(corrected.rac[corrected.len - 1] - corrected.rac[0]) < 1.0);
+
+    GARun raw;
+    raw.Analyze(s, 0, s.entries.size(), false, false);
+    CHECK_THAT(raw.rac[raw.len - 1] - raw.rac[0], WithinAbs(48., 0.5));
+    CHECK(raw.decc[0] == s.entries[0].decraw);
+}

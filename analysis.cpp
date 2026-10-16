@@ -282,7 +282,8 @@ bool GARun::CanAnalyze(const GuideSession& session, size_t begin, size_t end)
     return false;
 }
 
-void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections)
+void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections,
+                    bool drift_correction)
 {
     starts = session.starts;
     pixscale = session.pixelScale;
@@ -344,6 +345,8 @@ void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool 
 
     Line lR(fitR);
     Line lD(fitD);
+    if (!drift_correction)
+        lR.a = lR.b = lD.a = lD.b = 0.;
 
     pt = &t[0];
     pra = &ra[0];
