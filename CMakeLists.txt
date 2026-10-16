@@ -195,14 +195,14 @@ if(WIN32)
   list(APPEND SRC openastro-guide-insight.rc)
 endif()
 
-# The macOS icon is made from the PNG at build time.
+# The macOS icon is made at build time from its PNG on Apple's icon grid.
 if(APPLE)
   set(GUIDEINSIGHT_ICNS ${CMAKE_CURRENT_BINARY_DIR}/openastro-guide-insight.icns)
   add_custom_command(
     OUTPUT ${GUIDEINSIGHT_ICNS}
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/make-icns.sh
-            ${CMAKE_CURRENT_SOURCE_DIR}/openastro-guide-insight.png ${GUIDEINSIGHT_ICNS}
-    DEPENDS openastro-guide-insight.png scripts/make-icns.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/openastro-guide-insight-macos.png ${GUIDEINSIGHT_ICNS}
+    DEPENDS openastro-guide-insight-macos.png scripts/make-icns.sh
     COMMENT "Making the macOS icon")
   set_source_files_properties(${GUIDEINSIGHT_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   list(APPEND SRC ${GUIDEINSIGHT_ICNS})
