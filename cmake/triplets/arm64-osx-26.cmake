@@ -1,7 +1,7 @@
 # vcpkg triplet for macOS Apple Silicon release builds.
 #
 # Same as the built-in arm64-osx triplet, but pins the deployment target so
-# the static dependencies run on the same macOS versions as phdlogview
+# the static dependencies run on the same macOS versions as the app
 # itself. Without this, vcpkg targets the build machine's macOS version.
 set(VCPKG_TARGET_ARCHITECTURE arm64)
 set(VCPKG_CRT_LINKAGE dynamic)

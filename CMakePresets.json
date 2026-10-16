@@ -23,7 +23,7 @@
       "cacheVariables": {
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
         "VCPKG_OVERLAY_PORTS": "${sourceDir}/vcpkg-ports",
-        "PHDLOGVIEW_EXPECTED_WX_VERSION": "3.2.12"
+        "GUIDEINSIGHT_EXPECTED_WX_VERSION": "3.2.12"
       }
     },
     {
@@ -45,7 +45,7 @@
         "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
-        "PHDLOGVIEW_WERROR": "ON"
+        "GUIDEINSIGHT_WERROR": "ON"
       },
       "condition": {
         "type": "notEquals",
