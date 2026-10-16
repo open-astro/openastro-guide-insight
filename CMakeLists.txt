@@ -146,6 +146,7 @@ set(SRC
   ChartHost.h
   ChartView.cpp
   ChartView.h
+  commands.h
   DriftCanvas.cpp
   DriftCanvas.h
   FrequencyCanvas.cpp
@@ -181,6 +182,12 @@ if(WIN32)
 endif()
 
 add_executable(guideinsight WIN32 MACOSX_BUNDLE ${SRC})
+
+# The resource file embeds wxWidgets' manifest (DPI awareness, common
+# controls); stop MSVC's linker adding a second one.
+if(MSVC)
+  target_link_options(guideinsight PRIVATE /MANIFEST:NO)
+endif()
 
 target_link_libraries(guideinsight PRIVATE guideinsight_core)
 guideinsight_warnings(guideinsight)
