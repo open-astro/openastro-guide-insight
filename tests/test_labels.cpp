@@ -160,6 +160,75 @@ TEST_CASE("Every frame used reads as a plain count", "[labels]")
     CHECK(Summarize(Stats(), 149, 2., Units::Pixels).frames == "149 frames");
 }
 
+namespace {
+
+GuideSession HoverSession()
+{
+    GuideSession s("2026-10-04 07:06:47");
+    s.starts.ParseISOCombined("2026-10-04 07:06:47", ' ');
+    s.pixelScale = 2.;
+    GuideEntry e{};
+    e.frame = 53;
+    e.dt = 10.4f;
+    e.included = true;
+    e.raraw = -0.015f;
+    e.decraw = 0.06f;
+    e.dx = 0.5f;
+    e.dy = -0.25f;
+    e.radur = -120;
+    e.decdur = 0;
+    e.snr = 52.13f;
+    e.mass = 30411;
+    s.entries.push_back(e);
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("Hovering over a frame describes it", "[labels]")
+{
+    GuideSession s = HoverSession();
+    CHECK(HoverText(s, 0, Units::ArcSeconds, true) ==
+          "07:06:57 \u00b7 frame 53 \u00b7 RA \u22120.03\u2033 \u00b7 Dec 0.12\u2033 \u00b7 "
+          "pulse RA 120 ms E \u00b7 SNR 52.1 \u00b7 mass 30411");
+}
+
+TEST_CASE("The hover text follows the units and axes", "[labels]")
+{
+    GuideSession s = HoverSession();
+    s.entries[0].radur = 0;
+    s.entries[0].decdur = -40;
+    CHECK(HoverText(s, 0, Units::Pixels, false) ==
+          "07:06:57 \u00b7 frame 53 \u00b7 dx 0.50 px \u00b7 dy \u22120.25 px \u00b7 "
+          "pulse Dec 40 ms S \u00b7 SNR 52.1 \u00b7 mass 30411");
+}
+
+TEST_CASE("The hover text notes what is unusual about a frame", "[labels]")
+{
+    GuideSession s = HoverSession();
+    GuideEntry& e = s.entries[0];
+    e.radur = 0;
+    e.err = 1; // saturated
+    e.included = false;
+    e.info = "DITHER by 3.402, -1.056";
+    CHECK(HoverText(s, 0, Units::ArcSeconds, true) ==
+          "07:06:57 \u00b7 frame 53 \u00b7 RA \u22120.03\u2033 \u00b7 Dec 0.12\u2033 \u00b7 "
+          "SNR 52.1 \u00b7 mass 30411 \u00b7 saturated \u00b7 excluded \u00b7 DITHER by 3.402, -1.056");
+
+    e.err = 2; // lost
+    e.info.clear();
+    e.included = true;
+    CHECK(HoverText(s, 0, Units::ArcSeconds, true) == "07:06:57 \u00b7 frame 53 \u00b7 star lost");
+}
+
+TEST_CASE("The subtitle says how much of the session is in view", "[labels]")
+{
+    GuideSession s = HoverSession();
+    s.duration = 1662.;
+    CHECK(VisibleRange(s, 0., 1662.) == "Whole session");
+    CHECK(VisibleRange(s, 653., 1373.) == "07:17:40 \u2013 07:29:40 of 27 min 42 s");
+}
+
 TEST_CASE("Copied statistics are CSV with a decimal point", "[labels]")
 {
     CommaDecimalLocale comma;
