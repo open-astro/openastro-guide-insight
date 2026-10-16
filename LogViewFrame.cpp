@@ -375,7 +375,7 @@ void LogViewFrame::OpenLog(const wxString& filename)
             IncludeAll(session->entries);
             ExcludeSettling(session);
             session->CalcStats();
-            m_sessions->SetCellValue(row, 2, "Guiding");
+            m_sessions->SetCellValue(row, 2, SessionLabel(*session));
             m_sessions->SetCellValue(row, 3, durStr(session->duration));
         }
         m_sessions->SetCellValue(row, 1, s->date);
