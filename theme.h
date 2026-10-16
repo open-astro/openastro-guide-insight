@@ -45,6 +45,7 @@ struct Palette
     wxColour accent;
     wxColour viewFill;        // the overview's visible range
     wxColour segBg, segSel;   // segmented control
+    wxColour good, fair, poor; // assessment verdicts
 };
 
 // The palette for the system's current appearance. RA and Dec use the

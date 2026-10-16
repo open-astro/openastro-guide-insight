@@ -95,10 +95,26 @@ const char *HELP_HTML =
     "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between them. CMD-click or "
     "SHIFT-click several guiding sessions to see them as one, at their clock times, with statistics for them all.</li>"
     "<li>The <b>toolbar</b> switches the chart between Timeline, Scatter, Drift and Frequency (CMD+1 to CMD+4).</li>"
-    "<li>The <b>inspector</b> shows the statistics, drift and polar alignment, the session's equipment and "
-    "settings (with the raw header), display options, analysis options and exclusion rules.</li>"
+    "<li>The <b>inspector</b> shows the assessment, the statistics, drift and polar alignment, the session's "
+    "equipment and settings (with the raw header), display options, analysis options and exclusion rules.</li>"
     "<li>Hide the sidebar or the inspector from the View menu or the toolbar.</li>"
     "</ul>"
+
+    "<h3>Assessment</h3>"
+    "<p>The top of the inspector says how good the guiding was and what to change, for the session or the "
+    "selection.</p>"
+    "<ul>"
+    "<li><b>The verdict</b> compares the total RMS with one pixel of the camera taking the images: under half a "
+    "pixel is excellent, under one is good. It needs the imaging telescope and camera, which OpenAstro PHD2 and "
+    "OpenAstro Guider write into the log; other logs get no verdict.</li>"
+    "<li><b>Why</b> explains the total: how much is the guide camera measuring the star, whether what's left is "
+    "random (the sky) or builds up (the mount), and, when the log has a Guiding Assistant run, how close guiding "
+    "came to what the sky allowed.</li>"
+    "<li><b>To improve</b> lists what the log points to, most important first, with the settings to try. "
+    "<b>Show on the timeline</b> selects the frames a finding is about.</li>"
+    "<li><b>Going well</b> lists what needs no change.</li>"
+    "</ul>"
+    "<p>Suggestions are starting points. Change one setting at a time and compare the next night.</p>"
 
     "<h3>Timeline</h3>"
     "<ul>"
@@ -444,6 +460,11 @@ void MainFrame::BuildLayout()
     m_inspector->onIncludeAll = [this](bool include) {
         m_doc.IncludeAll(include);
         UpdateAll();
+    };
+    m_inspector->onShowFrames = [this](const IndexRun& run) {
+        m_doc.SetSelection(run);
+        SetView(ChartKind::Timeline);
+        SelectionChanged();
     };
 
     // let a log be dropped on the chart too

@@ -27,6 +27,7 @@
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/hyperlink.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -51,6 +52,22 @@ wxFlexGridSizer *FieldGrid()
     return grid;
 }
 
+// Everything the assessment section shows, to tell when it changes.
+std::string Signature(const Assessment& a)
+{
+    std::string s = a.total + a.verdictLabel + a.scale + a.why;
+    for (const auto *list : { &a.improve, &a.good })
+        for (const Finding& f : *list)
+        {
+            s += "|" + f.title + f.body + f.evidence;
+            for (const Change& c : f.changes)
+                s += c.setting + c.from + c.to;
+            if (f.frames)
+                s += std::to_string(f.frames->first) + "-" + std::to_string(f.frames->last);
+        }
+    return s;
+}
+
 } // namespace
 
 void Inspector::Section::Show(bool show)
@@ -69,6 +86,18 @@ Inspector::Inspector(wxWindow *parent)
 
     m_empty = Secondary(new wxStaticText(this, wxID_ANY, "No section selected"));
     sizer->Add(m_empty, 0, wxALL, FromDIP(14));
+
+    // Assessment: how good the guiding was and what to change
+    m_assessment = AddSection("Assessment");
+    m_assessment.body->SetSizer(new wxBoxSizer(wxVERTICAL));
+    Bind(wxEVT_SIZE, [this](wxSizeEvent& e) {
+        e.Skip();
+        if (!m_wrapped.empty() && GetClientSize().x - FromDIP(24) != m_wrapWidth)
+            CallAfter([this] {
+                WrapTexts();
+                Relayout();
+            });
+    });
 
     // Summary
     m_summary = AddSection("Summary");
@@ -362,6 +391,8 @@ void Inspector::SetPalette(const Palette& palette)
         h->SetPalette(palette);
     for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device, m_driftModel, m_rmsWindow })
         c->SetPalette(palette);
+    if (m_assessed)
+        FillAssessment();
     Refresh();
 }
 
@@ -369,6 +400,129 @@ void Inspector::Relayout()
 {
     Layout();
     FitInside();
+}
+
+void Inspector::ShowAssessment(const Assessment& a)
+{
+    if (m_assessed && Signature(a) == Signature(m_shown))
+        return;
+    m_shown = a;
+    m_assessed = true;
+    FillAssessment();
+}
+
+// Builds the assessment section from m_shown.
+void Inspector::FillAssessment()
+{
+    const Assessment& a = m_shown;
+    wxWindow *p = m_assessment.body;
+    p->DestroyChildren();
+    m_wrapped.clear();
+    auto s = new wxBoxSizer(wxVERTICAL);
+    p->SetSizer(s, true);
+
+    int gap = FromDIP(4);
+    wxFont small = GetFont().Smaller();
+    auto text = [&](wxWindow *parent, const std::string& label, const wxColour& colour, const wxFont& font,
+                    int indent = -1) {
+        auto t = new wxStaticText(parent, wxID_ANY, wxEmptyString);
+        t->SetLabelText(U(label));
+        t->SetForegroundColour(colour);
+        t->SetFont(font);
+        if (indent >= 0)
+            m_wrapped.push_back(Wrapped{ t, U(label), indent });
+        return t;
+    };
+    auto caption = [&](const char *label) {
+        wxStaticText *t = text(p, label, m_palette.text2, small.Bold());
+        s->Add(t, 0, wxTOP | wxBOTTOM, FromDIP(8));
+    };
+
+    // the total and the verdict
+    auto top = new wxBoxSizer(wxHORIZONTAL);
+    top->Add(text(p, a.total, m_palette.text, GetFont().Scaled(2.f).Bold()), 0, wxALIGN_CENTER_VERTICAL);
+    if (!a.verdictLabel.empty())
+    {
+        wxColour c = a.verdict == Verdict::Poor ? m_palette.poor :
+                     a.verdict == Verdict::Fair ? m_palette.fair : m_palette.good;
+        top->Add(text(p, a.verdictLabel, c, GetFont().Scaled(1.2f).Bold()), 0, wxALIGN_CENTER_VERTICAL | wxLEFT,
+                 FromDIP(10));
+    }
+    s->Add(top);
+    s->Add(text(p, a.scale, m_palette.text, GetFont(), 0), 0, wxTOP, gap);
+
+    std::string question = "Why " + a.total + (a.verdict == Verdict::Excellent ? "?" : " and not lower?");
+    s->Add(text(p, question, m_palette.text, GetFont().Bold(), 0), 0, wxTOP, FromDIP(10));
+    s->Add(text(p, a.why, m_palette.text2, GetFont(), 0), 0, wxTOP, gap);
+
+    caption("TO IMPROVE");
+    if (a.improve.empty())
+        s->Add(text(p, "Nothing to change in the settings this log shows.", m_palette.text2, GetFont(), 0));
+    int number = 1;
+    int indent = FromDIP(20);
+    for (const Finding& f : a.improve)
+    {
+        auto row = new wxBoxSizer(wxHORIZONTAL);
+        wxStaticText *n = text(p, std::to_string(number++), m_palette.fair, GetFont().Bold());
+        n->SetMinSize(wxSize(indent, -1));
+        row->Add(n);
+        auto col = new wxBoxSizer(wxVERTICAL);
+        col->Add(text(p, f.title, m_palette.text, GetFont().Bold(), indent));
+        col->Add(text(p, f.body, m_palette.text, GetFont(), indent), 0, wxTOP, FromDIP(2));
+        if (!f.changes.empty())
+        {
+            auto grid = new wxFlexGridSizer(2, wxSize(FromDIP(10), FromDIP(2)));
+            for (const Change& c : f.changes)
+            {
+                grid->Add(text(p, c.setting, m_palette.text2, GetFont()));
+                grid->Add(text(p, c.from + " → " + c.to, m_palette.text, GetFont().Bold()));
+            }
+            col->Add(grid, 0, wxTOP, gap);
+        }
+        if (!f.evidence.empty())
+            col->Add(text(p, f.evidence, m_palette.text2, small, indent), 0, wxTOP, gap);
+        if (f.frames)
+        {
+            auto link = new wxHyperlinkCtrl(p, wxID_ANY, "Show on the timeline", wxEmptyString);
+            IndexRun run = *f.frames;
+            link->Bind(wxEVT_HYPERLINK, [this, run](wxHyperlinkEvent&) {
+                if (onShowFrames)
+                    onShowFrames(run);
+            });
+            col->Add(link, 0, wxTOP, gap);
+        }
+        row->Add(col, 1);
+        s->Add(row, 0, wxEXPAND | wxBOTTOM, FromDIP(8));
+    }
+
+    if (!a.good.empty())
+    {
+        caption("GOING WELL");
+        for (const Finding& f : a.good)
+        {
+            auto row = new wxBoxSizer(wxHORIZONTAL);
+            wxStaticText *tick = text(p, "✓", m_palette.good, GetFont().Bold());
+            tick->SetMinSize(wxSize(indent, -1));
+            row->Add(tick);
+            row->Add(text(p, f.title + (f.body.empty() ? "" : ". " + f.body), m_palette.text2, GetFont(), indent), 1);
+            s->Add(row, 0, wxEXPAND | wxBOTTOM, gap);
+        }
+    }
+
+    s->Add(text(p, "Suggestions are starting points from this log. Change one setting at a time and compare the "
+                   "next night's assessment.", m_palette.text2, small, 0), 0, wxTOP, FromDIP(8));
+    WrapTexts();
+}
+
+void Inspector::WrapTexts()
+{
+    // the section body's width: the inspector less the body's margins
+    m_wrapWidth = GetClientSize().x - FromDIP(24);
+    for (const Wrapped& w : m_wrapped)
+    {
+        w.text->SetLabelText(w.label);
+        w.text->Wrap(std::max(FromDIP(60), m_wrapWidth - w.indent));
+    }
 }
 
 DisplayOptions Inspector::Options() const
@@ -412,7 +566,7 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
 
     m_empty->Show(!section);
     const Calibration *cal = doc.CalibrationSection();
-    for (Section *s : { &m_summary, &m_drift, &m_display, &m_exclusions })
+    for (Section *s : { &m_assessment, &m_summary, &m_drift, &m_display, &m_exclusions })
         s->Show(session != nullptr);
     m_calibration.Show(cal != nullptr);
     bool analysing = session && (settings.view == ChartKind::Drift || settings.view == ChartKind::Frequency);
@@ -435,6 +589,11 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
 
     if (session)
     {
+        const auto& sel = doc.Selection();
+        size_t begin = sel ? sel->first : 0, end = sel ? sel->last + 1 : session->entries.size();
+        m_assessment.header->SetTitle(sel ? "Assessment of selection" : "Assessment");
+        ShowAssessment(Assess(doc.Log(), *session, begin, end, doc.Stats()));
+
         Units units = settings.display.units;
         size_t frames = doc.Selection() ? doc.Selection()->last - doc.Selection()->first + 1 : session->entries.size();
         SummaryText t = Summarize(doc.Stats(), frames, session->pixelScale, units);
