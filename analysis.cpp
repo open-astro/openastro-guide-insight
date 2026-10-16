@@ -438,3 +438,27 @@ std::string FftCsv(const GARun& ga)
     }
     return out;
 }
+
+std::string SessionLabel(const GuideSession& session)
+{
+    bool ga = false;
+    for (const InfoEntry& info : session.infos)
+        if (info.info.rfind("GA Result", 0) == 0)
+            ga = true;
+
+    bool anyGuided = false, anyUnguided = false;
+    for (const GuideEntry& e : session.entries)
+        (e.guiding ? anyGuided : anyUnguided) = true;
+
+    if (ga)
+        return anyGuided ? "Guiding + GA" : "Guiding Assistant";
+
+    if (anyUnguided && !anyGuided)
+        return "Unguided";
+
+    for (const wxString& line : session.hdr)
+        if (line.Contains("DEC guide mode = Off"))
+            return "Guiding, RA only";
+
+    return "Guiding";
+}
