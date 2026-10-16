@@ -49,7 +49,8 @@ struct ExclusionSettings
 // settings pick out.
 void ApplyExclusions(GuideSession& session, const ExclusionSettings& settings);
 
-// The largest RA or Dec offset in the session, in guide-camera pixels.
+// The largest RA or Dec offset among the frames that count toward the
+// statistics, or among all frames when none do, in guide-camera pixels.
 double MaxOffset(const GuideSession& session);
 
 // What one session's chart shows.

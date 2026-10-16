@@ -39,10 +39,20 @@ void ApplyExclusions(GuideSession& session, const ExclusionSettings& settings)
 
 double MaxOffset(const GuideSession& session)
 {
-    double mx = 0.;
+    // the frames that count, unless none do
+    double counted = 0., all = 0.;
+    bool any = false;
     for (const auto& e : session.entries)
-        mx = std::max({ mx, (double) fabs(e.raraw), (double) fabs(e.decraw) });
-    return mx;
+    {
+        double v = std::max(fabs(e.raraw), fabs(e.decraw));
+        all = std::max(all, v);
+        if (e.included && StarWasFound(e.err))
+        {
+            counted = std::max(counted, v);
+            any = true;
+        }
+    }
+    return any ? counted : all;
 }
 
 // The closest zoom: the same for a time axis as for a frame axis, taking
