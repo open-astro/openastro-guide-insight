@@ -28,6 +28,7 @@ add_executable(guideinsight_tests
   test_periodogram.cpp
   test_exclusion.cpp
   test_settingsmigration.cpp
+  test_assessment.cpp
 )
 target_link_libraries(guideinsight_tests PRIVATE guideinsight_core Catch2::Catch2)
 guideinsight_warnings(guideinsight_tests)

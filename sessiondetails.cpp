@@ -135,6 +135,20 @@ std::string Pointing(const std::string& line)
     return s;
 }
 
+// An OpenAstro guider writes "unknown" for what a driver doesn't report.
+std::string Known(const std::string& value)
+{
+    return value == "unknown" ? std::string() : value;
+}
+
+// "name · detail", or just the name when the detail is unknown.
+std::string Joined(const std::string& name, const std::string& detail)
+{
+    if (Known(name).empty())
+        return std::string();
+    return Known(detail).empty() ? name : name + " \u00b7 " + detail;
+}
+
 } // namespace
 
 std::vector<DetailField> SessionDetails(const wxArrayString& hdr)
@@ -175,11 +189,25 @@ std::vector<DetailField> SessionDetails(const wxArrayString& hdr)
             add(ao ? "AO Y algorithm" : "Dec algorithm", FirstItem(value("Y guide algorithm = ")));
         else if (StartsWith(line, "RA = "))
             add("Pointing", Pointing(line));
+        else if (StartsWith(line, "Imaging telescope = "))
+            add("Telescope", Joined(FirstItem(value("Imaging telescope = ")), Setting(line, "Focal length")));
+        else if (StartsWith(line, "Imaging camera = "))
+        {
+            std::string name = FirstItem(value("Imaging camera = "));
+            if (!StartsWith(name, "ambiguous") && name != "unknown")
+            {
+                std::string scale = Setting(line, "Pixel scale");
+                add("Imaging camera", Joined(name, scale == "unknown" ? scale : StripSuffix(scale, " arc-sec/px") + "\u2033/px"));
+            }
+        }
+        else if (StartsWith(line, "Filter wheel = "))
+            add("Filter", Known(Setting(line, "Filter")));
     }
 
     static const char *const order[] = {
         "Profile", "Camera", "Mount", "AO", "Pixel scale", "Exposure",
         "RA algorithm", "Dec algorithm", "AO X algorithm", "AO Y algorithm", "Pointing",
+        "Telescope", "Imaging camera", "Filter",
     };
 
     std::vector<DetailField> fields;
