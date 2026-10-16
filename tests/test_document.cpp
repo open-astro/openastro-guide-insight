@@ -102,6 +102,15 @@ TEST_CASE("A log that cannot be read leaves the open log alone", "[document]")
     CHECK(doc.Current());
 }
 
+TEST_CASE("Opening a long log reports progress", "[document]")
+{
+    Document doc;
+    std::ifstream ifs(REAL_LOG);
+    int calls = 0;
+    REQUIRE(doc.Load(ifs, [&calls] { calls++; }));
+    CHECK(calls > 0);
+}
+
 TEST_CASE("An empty log has no current section", "[document]")
 {
     Document doc = Load("");
@@ -182,6 +191,19 @@ TEST_CASE("Including with no selection includes the whole session", "[document]"
     CHECK(Excluded(*doc.Session()) == doc.Session()->entries.size());
 }
 
+TEST_CASE("Including or excluding all frames ignores the selection", "[document]")
+{
+    Document doc = RealLog();
+    doc.Select(2);
+    doc.SetSelection(IndexRun{ 50, 99 });
+    doc.IncludeAll(false);
+    CHECK(Excluded(*doc.Session()) == doc.Session()->entries.size());
+    CHECK(doc.Selection());
+    doc.IncludeAll(true);
+    CHECK(Excluded(*doc.Session()) == 0);
+    CHECK(doc.Session()->rms_ra > 0.);
+}
+
 TEST_CASE("A calibration has no selection, statistics or view", "[document]")
 {
     Document doc = RealLog();
@@ -190,6 +212,7 @@ TEST_CASE("A calibration has no selection, statistics or view", "[document]")
     CHECK(doc.Stats().frames == 0);
     CHECK_FALSE(doc.View());
     doc.IncludeSelection(false); // nothing to do, and no crash
+    doc.IncludeAll(false);
 }
 
 TEST_CASE("Each session keeps its own view", "[document]")
