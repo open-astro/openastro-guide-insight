@@ -217,6 +217,25 @@ Inspector::Inspector(wxWindow *parent)
         m_snr = check("SNR", "Show the guide star's signal-to-noise ratio");
         s->Add(series, 0, wxEXPAND | wxTOP, FromDIP(10));
 
+        // running RMS and its window, on one row
+        auto rmsRow = new wxBoxSizer(wxHORIZONTAL);
+        m_runningRms = new wxCheckBox(p, wxID_ANY, "Running RMS");
+        m_runningRms->SetToolTip("Show the total RMS over the last few minutes at each frame, to see guiding "
+                                 "get better or worse through the night");
+        m_rmsWindow = new SegmentedControl(p, wxID_ANY, { "1", "2", "5", "10 min" }, "Running RMS window");
+        m_rmsWindow->SetToolTip("How far back the running RMS looks");
+        rmsRow->Add(m_runningRms, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(8));
+        rmsRow->Add(m_rmsWindow, 0, wxALIGN_CENTER_VERTICAL);
+        m_runningRms->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+            if (onDisplay)
+                onDisplay(Options());
+        });
+        m_rmsWindow->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) {
+            if (onDisplay)
+                onDisplay(Options());
+        });
+        s->Add(rmsRow, 0, wxTOP, FromDIP(8));
+
         m_lock = new wxCheckBox(p, wxID_ANY, "Lock vertical scale");
         m_lock->SetToolTip("Use the same vertical scale, in arc-seconds, for every session");
         m_lock->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& e) {
@@ -341,7 +360,7 @@ void Inspector::SetPalette(const Palette& palette)
         t->SetForegroundColour(palette.text2);
     for (SectionHeader *h : m_headers)
         h->SetPalette(palette);
-    for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device, m_driftModel })
+    for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device, m_driftModel, m_rmsWindow })
         c->SetPalette(palette);
     Refresh();
 }
@@ -367,6 +386,9 @@ DisplayOptions Inspector::Options() const
     d.limits = m_limits->GetValue();
     d.mass = m_mass->GetValue();
     d.snr = m_snr->GetValue();
+    d.runningRms = m_runningRms->GetValue();
+    static const int windows[] = { 60, 120, 300, 600 };
+    d.rmsWindow = windows[std::clamp(m_rmsWindow->GetSelection(), 0, 3)];
     return d;
 }
 
@@ -449,6 +471,8 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
         m_showRa->SetLabel(d.raDecAxes ? "RA" : "dx");
         m_showDec->SetLabel(d.raDecAxes ? "Dec" : "dy");
         m_lock->SetValue(doc.VerticalScaleLocked());
+        m_runningRms->SetValue(d.runningRms);
+        m_rmsWindow->SetSelection(d.rmsWindow <= 60 ? 0 : d.rmsWindow <= 120 ? 1 : d.rmsWindow <= 300 ? 2 : 3);
 
         size_t excluded = 0;
         for (const auto& e : session->entries)

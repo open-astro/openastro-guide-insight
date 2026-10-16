@@ -22,6 +22,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <string>
 
 using Catch::Approx;
@@ -193,4 +194,51 @@ TEST_CASE("A session guiding both a mount and an AO has both devices", "[timelin
     CHECK_FALSE(HasBothDevices(s));
     s.entries[2].mount = AO;
     CHECK(HasBothDevices(s));
+}
+
+TEST_CASE("The running RMS covers the frames in the window", "[timeline]")
+{
+    // frames 2 s apart; RA alternates +1 and -1, Dec stays 0
+    GuideSession::EntryVec e;
+    for (int i = 0; i < 20; i++)
+    {
+        GuideEntry g = Entry(2.f * (float) i);
+        g.raraw = i % 2 ? -1.f : 1.f;
+        g.decraw = 0.f;
+        e.push_back(g);
+    }
+    // an 8 s window holds four frames: two of each sign
+    std::vector<double> rms = RunningRms(e, 8.);
+    REQUIRE(rms.size() == 20);
+    CHECK(std::isnan(rms[0]));    // one frame in its window
+    CHECK(rms[1] == Approx(1.));  // +1 and -1
+    CHECK(rms[19] == Approx(1.)); // frames at 32 .. 38 s
+    // a 10 s window holds five: three of one sign, two of the other
+    CHECK(RunningRms(e, 10.)[19] == Approx(sqrt(0.96)));
+}
+
+TEST_CASE("The running RMS leaves out excluded and lost frames", "[timeline]")
+{
+    GuideSession::EntryVec e;
+    for (int i = 0; i < 6; i++)
+    {
+        GuideEntry g = Entry(2.f * (float) i);
+        g.raraw = 0.f;
+        g.decraw = i % 2 ? 3.f : -3.f; // RMS 3 about the mean
+        e.push_back(g);
+    }
+    e[4].included = false;
+    e[4].raraw = 100.f;
+    e[5].err = 2; // lost
+    e[5].raraw = 100.f;
+    std::vector<double> rms = RunningRms(e, 100.);
+    CHECK(rms[3] == Approx(3.));
+    CHECK(rms[5] == Approx(3.));
+}
+
+TEST_CASE("A window of a single frame has no running RMS", "[timeline]")
+{
+    GuideSession::EntryVec e{ Entry(0.f), Entry(30.f), Entry(60.f) };
+    for (double v : RunningRms(e, 10.))
+        CHECK(std::isnan(v));
 }

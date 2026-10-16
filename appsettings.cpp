@@ -128,6 +128,8 @@ AppSettings LoadSettings(const wxConfigBase& c)
     d.limits = c.ReadBool("/display/limits", d.limits);
     d.mass = c.ReadBool("/display/mass", d.mass);
     d.snr = c.ReadBool("/display/snr", d.snr);
+    d.runningRms = c.ReadBool("/display/runningRms", d.runningRms);
+    d.rmsWindow = std::max((int) c.ReadLong("/display/rmsWindow", d.rmsWindow), 10);
 
     s.analysis.drift = DRIFTS.Read(c, "/analysis/drift", s.analysis.drift);
     s.analysis.rawRa = c.ReadBool("/analysis/rawRa", s.analysis.rawRa);
@@ -168,6 +170,8 @@ void SaveSettings(wxConfigBase& c, const AppSettings& s)
     c.Write("/display/limits", d.limits);
     c.Write("/display/mass", d.mass);
     c.Write("/display/snr", d.snr);
+    c.Write("/display/runningRms", d.runningRms);
+    c.Write("/display/rmsWindow", (long) d.rmsWindow);
 
     DRIFTS.Write(c, "/analysis/drift", s.analysis.drift);
     c.Write("/analysis/rawRa", s.analysis.rawRa);
