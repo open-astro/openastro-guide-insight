@@ -147,6 +147,8 @@ add_library(guideinsight_core STATIC
   timeline.h
   scatter.cpp
   scatter.h
+  periodogram.cpp
+  periodogram.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp

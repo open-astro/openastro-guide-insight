@@ -473,6 +473,28 @@ std::string FftCsv(const GARun& ga)
     return out;
 }
 
+std::vector<IndexRun> GuidingAssistantRuns(const GuideSession& session)
+{
+    std::vector<IndexRun> runs;
+    const auto& entries = session.entries;
+    size_t i = 0;
+    while (i < entries.size())
+    {
+        if (entries[i].guiding)
+        {
+            i++;
+            continue;
+        }
+        size_t end = i;
+        while (end < entries.size() && !entries[end].guiding)
+            end++;
+        if (GARun::CanAnalyze(session, i, end))
+            runs.push_back(IndexRun{ (unsigned int) i, (unsigned int) end - 1 });
+        i = end;
+    }
+    return runs;
+}
+
 std::string SessionLabel(const GuideSession& session)
 {
     bool ga = false;
