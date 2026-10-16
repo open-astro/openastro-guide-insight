@@ -25,6 +25,8 @@
 
 #include <wx/arrstr.h>
 
+#include "logparser.h"
+
 #include <string>
 #include <vector>
 
@@ -38,5 +40,9 @@ struct DetailField
 // order: Profile, Camera, Mount, AO, Pixel scale, Exposure, the guide
 // algorithms and Pointing. Fields the header does not mention are left out.
 std::vector<DetailField> SessionDetails(const wxArrayString& hdr);
+
+// What a calibration found: each axis's rate and angle, the orthogonality
+// error, the step size and how many steps each direction took.
+std::vector<DetailField> CalibrationDetails(const Calibration& cal);
 
 #endif

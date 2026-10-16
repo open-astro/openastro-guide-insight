@@ -145,6 +145,8 @@ add_library(guideinsight_core STATIC
   appsettings.h
   timeline.cpp
   timeline.h
+  scatter.cpp
+  scatter.h
   exclusion.cpp
   exclusion.h
   settingsmigration.cpp
@@ -160,6 +162,10 @@ if(MSVC)
 endif()
 
 set(SRC
+  CalibrationCanvas.cpp
+  CalibrationCanvas.h
+  chartdraw.cpp
+  chartdraw.h
   ChartHost.cpp
   ChartHost.h
   ChartView.cpp
@@ -178,6 +184,8 @@ set(SRC
   SectionHeader.h
   Preferences.cpp
   Preferences.h
+  ScatterCanvas.cpp
+  ScatterCanvas.h
   SegmentedControl.cpp
   SegmentedControl.h
   SessionSidebar.cpp
