@@ -19,7 +19,9 @@
 
 #include "ChartView.h"
 
+#include "CalibrationCanvas.h"
 #include "OverviewScrubber.h"
+#include "ScatterCanvas.h"
 #include "TimelineCanvas.h"
 
 #include <wx/dcbuffer.h>
@@ -107,8 +109,12 @@ ChartView::ChartView(wxWindow *parent, ChartHost& host)
     });
     m_message->Bind(wxEVT_SIZE, [this](wxSizeEvent& e) { m_message->Refresh(); e.Skip(); });
     m_timeline = new TimelineCanvas(m_book, host);
+    m_scatter = new ScatterCanvas(m_book, host);
+    m_calibration = new CalibrationCanvas(m_book, host);
     m_book->AddPage(m_message, "Message");
     m_book->AddPage(m_timeline, "Timeline");
+    m_book->AddPage(m_scatter, "Scatter");
+    m_book->AddPage(m_calibration, "Calibration");
     sizer->Add(m_book, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
 
     sizer->AddSpacer(FromDIP(10));
@@ -181,6 +187,33 @@ void ChartView::ShowTimeline()
     RefreshChart();
 }
 
+void ChartView::ShowScatter()
+{
+    m_book->ChangeSelection(2);
+    if (m_overview->IsShown())
+    {
+        m_overview->Hide();
+        Layout();
+    }
+    RefreshChart();
+}
+
+void ChartView::ShowCalibration()
+{
+    m_book->ChangeSelection(3);
+    if (m_overview->IsShown())
+    {
+        m_overview->Hide();
+        Layout();
+    }
+    RefreshChart();
+}
+
+Chart *ChartView::ActiveChart() const
+{
+    return dynamic_cast<Chart *>(m_book->GetCurrentPage());
+}
+
 void ChartView::RefreshChart()
 {
     m_book->GetCurrentPage()->Refresh();
@@ -198,5 +231,5 @@ void ChartView::ApplyPalette()
 
 std::vector<wxWindow *> ChartView::DropTargets() const
 {
-    return { m_message, m_timeline };
+    return { m_message, m_timeline, m_scatter, m_calibration };
 }

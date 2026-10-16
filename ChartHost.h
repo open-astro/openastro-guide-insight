@@ -48,6 +48,17 @@ public:
     virtual void ShowStatus(const wxString& text) = 0;
 };
 
+// A chart the View menu can zoom.
+class Chart
+{
+public:
+    virtual ~Chart() = default;
+    virtual void ZoomBy(double factor) = 0;
+    virtual void ZoomToFit() = 0;
+    virtual bool CanZoomIn() = 0;
+    virtual bool CanZoomOut() = 0;
+};
+
 // How far a wheel or trackpad scroll moves, in pixels. A trackpad on macOS
 // reports pixels; a mouse wheel reports notches.
 double WheelPixels(const wxMouseEvent& event);

@@ -162,6 +162,10 @@ if(MSVC)
 endif()
 
 set(SRC
+  CalibrationCanvas.cpp
+  CalibrationCanvas.h
+  chartdraw.cpp
+  chartdraw.h
   ChartHost.cpp
   ChartHost.h
   ChartView.cpp
@@ -180,6 +184,8 @@ set(SRC
   SectionHeader.h
   Preferences.cpp
   Preferences.h
+  ScatterCanvas.cpp
+  ScatterCanvas.h
   SegmentedControl.cpp
   SegmentedControl.h
   SessionSidebar.cpp
