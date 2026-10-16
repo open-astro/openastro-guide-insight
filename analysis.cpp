@@ -288,14 +288,67 @@ GARun::~GARun()
     delete[] ffty;
 }
 
-struct Line
+double Polynomial::operator()(double x) const
 {
-    double a, b;
-    Line(const LFit& lf) {
-        lf.result(&a, &b);
+    double u = (x - x0) / scale, v = 0.;
+    for (size_t k = c.size(); k-- > 0;)
+        v = v * u + c[k];
+    return v;
+}
+
+Polynomial PolyFit(const double *x, const double *y, size_t n, int order)
+{
+    Polynomial p;
+    if (n == 0)
+        return p;
+    size_t m = (size_t) std::max(0, std::min(order, (int) n - 1)) + 1; // coefficients
+
+    for (size_t i = 0; i < n; i++)
+        p.x0 += x[i];
+    p.x0 /= (double) n;
+    double spread = 0.;
+    for (size_t i = 0; i < n; i++)
+        spread = std::max(spread, fabs(x[i] - p.x0));
+    p.scale = spread > 0. ? spread : 1.;
+
+    // the normal equations, A c = b, solved by elimination with pivoting
+    std::vector<std::vector<double>> a(m, std::vector<double>(m + 1, 0.));
+    for (size_t i = 0; i < n; i++)
+    {
+        double u = (x[i] - p.x0) / p.scale;
+        std::vector<double> pw(2 * m, 1.);
+        for (size_t k = 1; k < 2 * m; k++)
+            pw[k] = pw[k - 1] * u;
+        for (size_t r = 0; r < m; r++)
+        {
+            for (size_t col = 0; col < m; col++)
+                a[r][col] += pw[r + col];
+            a[r][m] += pw[r] * y[i];
+        }
     }
-    double operator()(double x) { return a + b * x; }
-};
+    for (size_t col = 0; col < m; col++)
+    {
+        size_t pivot = col;
+        for (size_t r = col + 1; r < m; r++)
+            if (fabs(a[r][col]) > fabs(a[pivot][col]))
+                pivot = r;
+        std::swap(a[col], a[pivot]);
+        if (a[col][col] == 0.)
+            continue;
+        for (size_t r = 0; r < m; r++)
+        {
+            if (r == col)
+                continue;
+            double f = a[r][col] / a[col][col];
+            for (size_t k = col; k <= m; k++)
+                a[r][k] -= f * a[col][k];
+        }
+    }
+    p.c.assign(m, 0.);
+    for (size_t k = 0; k < m; k++)
+        p.c[k] = a[k][k] != 0. ? a[k][m] / a[k][k] : 0.;
+    return p;
+}
 
 bool GARun::CanAnalyze(const GuideSession& session, size_t begin, size_t end)
 {
@@ -314,7 +367,7 @@ bool GARun::CanAnalyze(const GuideSession& session, size_t begin, size_t end)
 }
 
 void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections,
-                    bool drift_correction)
+                    DriftModel drift)
 {
     starts = session.starts;
     pixscale = session.pixelScale;
@@ -337,9 +390,6 @@ void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool 
     double *dec = new double[n];
     rac = new double[n];
     decc = new double[n];
-
-    LFit fitR; // ra fit
-    LFit fitD; // dec fit
 
     double *pt = &t[0];
     double *pra = &ra[0];
@@ -366,18 +416,19 @@ void GARun::Analyze(const GuideSession& session, size_t begin, size_t end, bool 
                 *pra++ = rapos;
                 *pdec++ = e.decraw;
 
-                fitR.data(e.dt, rapos);
-                fitD.data(e.dt, e.decraw);
             }
         }
     }
 
     // drift correction
 
-    Line lR(fitR);
-    Line lD(fitD);
-    if (!drift_correction)
-        lR.a = lR.b = lD.a = lD.b = 0.;
+    int order = drift == DriftModel::Curve ? 2 : drift == DriftModel::Line ? 1 : -1;
+    Polynomial lR, lD; // zero unless there is drift to take out
+    if (order >= 0)
+    {
+        lR = PolyFit(t, ra, n, order);
+        lD = PolyFit(t, dec, n, order);
+    }
 
     pt = &t[0];
     pra = &ra[0];

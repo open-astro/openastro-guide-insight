@@ -45,6 +45,24 @@ public:
     double Eval(double x) const;
 };
 
+// What GARun takes out of RA and Dec before the drift plot and periodogram:
+// nothing, a straight-line drift, or a curved (quadratic) drift.
+enum class DriftModel { None, Line, Curve };
+
+// A least-squares polynomial: sum of c[k] * ((x - x0) / scale)^k. Centring
+// and scaling x keeps the fit accurate for large frame times.
+struct Polynomial
+{
+    double x0 = 0.;
+    double scale = 1.;
+    std::vector<double> c{ 0. };
+    double operator()(double x) const;
+};
+
+// Fits a polynomial of the given order to n points, or of a lower order
+// when there are too few points for it.
+Polynomial PolyFit(const double *x, const double *y, size_t n, int order);
+
 struct GARun
 {
     wxDateTime starts;
@@ -61,10 +79,10 @@ struct GARun
     GARun() : len(0), t(nullptr), rac(nullptr), decc(nullptr), nfft(0), fftx(nullptr), ffty(nullptr) { }
     ~GARun();
     static bool CanAnalyze(const GuideSession& session, size_t begin, size_t end);
-    // drift_correction removes a straight-line fit from RA and Dec before the
-    // drift plot and periodogram; turning it off shows the raw positions.
+    // `drift` is the drift taken out of RA and Dec before the drift plot and
+    // periodogram; DriftModel::None shows the raw positions.
     void Analyze(const GuideSession& session, size_t begin, size_t end, bool undo_ra_corrections,
-                 bool drift_correction = true);
+                 DriftModel drift = DriftModel::Line);
 };
 
 // Statistics over the included frames, where the star was found, of entries
