@@ -3,10 +3,12 @@
 //
 // usage: swift art/make-app-icon.swift art/openastro-logo.png OUTPUT_DIR
 //
-// Writes OUTPUT_DIR/openastro-guide-insight.png (1024 px, on Apple's icon
-// grid, the source for the macOS .icns and the Linux icon) and
-// OUTPUT_DIR/openastro-guide-insight.ico (16 to 256 px, edge to edge, for
-// Windows).
+// Writes, in OUTPUT_DIR:
+// - openastro-guide-insight-macos.png: 1024 px on Apple's icon grid, the
+//   source for the macOS .icns
+// - openastro-guide-insight.png: 512 px edge to edge, for Linux (the
+//   AppImage tools take icons up to 512 px)
+// - openastro-guide-insight.ico: 16 to 256 px, edge to edge, for Windows
 
 import CoreGraphics
 import Foundation
@@ -118,8 +120,12 @@ func png(_ image: CGImage) -> Data {
 }
 
 // macOS: 824 px artwork centred in 1024, as Apple's icon grid has it
-let master = draw(size: 1024, artwork: 824, inset: 100, shadow: true)
-try png(master).write(to: outDir.appendingPathComponent("openastro-guide-insight.png"))
+let mac = draw(size: 1024, artwork: 824, inset: 100, shadow: true)
+try png(mac).write(to: outDir.appendingPathComponent("openastro-guide-insight-macos.png"))
+
+// Linux: edge to edge, like the Windows icon
+try png(draw(size: 512, artwork: 512, inset: 0, shadow: false))
+    .write(to: outDir.appendingPathComponent("openastro-guide-insight.png"))
 
 // Windows: an .ico of PNG images, each drawn at its own size
 let sizes = [16, 24, 32, 48, 64, 128, 256]
@@ -139,4 +145,4 @@ for (size, image) in zip(sizes, images) {
 }
 for image in images { ico.append(image) }
 try ico.write(to: outDir.appendingPathComponent("openastro-guide-insight.ico"))
-print("wrote openastro-guide-insight.png and openastro-guide-insight.ico")
+print("wrote the macOS, Linux and Windows icons")
