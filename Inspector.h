@@ -66,7 +66,11 @@ class Inspector : public wxScrolledWindow
     wxTextCtrl *m_raw;
 
     Section m_display;
-    SegmentedControl *m_units;
+    SegmentedControl *m_units, *m_axes, *m_xaxis, *m_device;
+    wxStaticText *m_deviceLabel;
+    wxCheckBox *m_showRa, *m_showDec, *m_corrections, *m_events, *m_grid, *m_limits, *m_mass, *m_snr;
+    wxCheckBox *m_lock;
+    DisplayOptions m_options;
 
     Section m_exclusions;
     wxStaticText *m_excluded;
@@ -83,11 +87,13 @@ class Inspector : public wxScrolledWindow
     void AlignLabels();
     void Relayout();
     ExclusionSettings Rules() const;
+    DisplayOptions Options() const;
 
 public:
     explicit Inspector(wxWindow *parent);
 
-    std::function<void(Units)> onUnits;
+    std::function<void(const DisplayOptions&)> onDisplay;
+    std::function<void(bool lock)> onLockVertical;
     std::function<void(const ExclusionSettings&)> onExclusions;
     std::function<void(bool include)> onIncludeAll;
 

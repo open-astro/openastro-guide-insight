@@ -24,6 +24,8 @@
 // dark appearances. Native controls take their colours from the system.
 
 #include <wx/colour.h>
+#include <wx/dc.h>
+#include <wx/window.h>
 
 #include <string>
 
@@ -47,5 +49,14 @@ struct Palette
 // The palette for the system's current appearance. RA and Dec use the
 // user's colours when they chose some ("#rrggbb"), else the theme's.
 Palette CurrentPalette(const std::string& raColor = std::string(), const std::string& decColor = std::string());
+
+// For windows the app draws itself. Called before the window is created, it
+// lets the window paint over its parent's background where the platform
+// supports that (macOS and GTK).
+void PaintOverParent(wxWindow *window);
+
+// In a paint handler: where painting over the parent is not supported,
+// fills the window with its parent's background colour.
+void ClearToParent(wxWindow *window, wxDC& dc);
 
 #endif

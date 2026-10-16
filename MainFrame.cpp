@@ -24,8 +24,10 @@
 #include "Preferences.h"
 #include "SegmentedControl.h"
 #include "SessionSidebar.h"
+#include "TimelineCanvas.h"
 #include "icons.h"
 #include "labels.h"
+#include "timeline.h"
 
 #include <wx/aboutdlg.h>
 #include <wx/busyinfo.h>
@@ -64,6 +66,15 @@ enum
     ID_INCLUDE_ALL,
     ID_EXCLUDE_ALL,
     ID_REAPPLY_RULES,
+    ID_DESELECT,
+    ID_EXCLUDE_SELECTION,
+    ID_INCLUDE_SELECTION,
+    ID_ZOOM_IN,
+    ID_ZOOM_OUT,
+    ID_ZOOM_FIT,
+    ID_ZOOM_SELECTION,
+    ID_FIT_VERTICAL,
+    ID_LOCK_VERTICAL,
 };
 
 const wxString VIEW_NAMES[] = { "Timeline", "Scatter", "Drift", "Frequency" };
@@ -171,6 +182,12 @@ void MainFrame::BuildMenus()
     auto edit = new wxMenu;
     edit->Append(wxID_COPY, "&Copy Statistics\tCtrl+C", "Copy the statistics as CSV");
     edit->AppendSeparator();
+    edit->Append(wxID_SELECTALL, "Select &All Frames\tCtrl+A");
+    edit->Append(ID_DESELECT, "&Deselect\tCtrl+Shift+A");
+    edit->AppendSeparator();
+    edit->Append(ID_EXCLUDE_SELECTION, "E&xclude Selected Frames\tCtrl+Back");
+    edit->Append(ID_INCLUDE_SELECTION, "I&nclude Selected Frames\tCtrl+Shift+Back");
+    edit->AppendSeparator();
     edit->Append(ID_INCLUDE_ALL, "&Include All Frames");
     edit->Append(ID_EXCLUDE_ALL, "&Exclude All Frames");
     edit->Append(ID_REAPPLY_RULES, "&Reapply Exclusion Rules",
@@ -183,6 +200,15 @@ void MainFrame::BuildMenus()
     auto view = new wxMenu;
     for (int i = 0; i < 4; i++)
         view->AppendRadioItem(ID_VIEW_TIMELINE + i, wxString::Format("%s\tCtrl+%d", VIEW_NAMES[i], i + 1));
+    view->AppendSeparator();
+    view->Append(ID_ZOOM_IN, "Zoom &In\tCtrl+=");
+    view->Append(ID_ZOOM_OUT, "Zoom &Out\tCtrl+-");
+    view->Append(ID_ZOOM_FIT, "Zoom to &Fit\tCtrl+0");
+    view->Append(ID_ZOOM_SELECTION, "Zoom to Se&lection\tCtrl+Shift+=");
+    view->AppendSeparator();
+    view->Append(ID_FIT_VERTICAL, "Fit &Vertical Scale\tCtrl+Shift+0");
+    view->AppendCheckItem(ID_LOCK_VERTICAL, "Loc&k Vertical Scale",
+                          "Use the same vertical scale, in arc-seconds, for every session");
     view->AppendSeparator();
 #ifdef __WXOSX__
     view->AppendCheckItem(ID_TOGGLE_SIDEBAR, "Show &Sidebar\tCtrl+RawCtrl+S");
@@ -226,6 +252,14 @@ void MainFrame::BuildMenus()
     Bind(wxEVT_MENU, &MainFrame::OnAbout, this, wxID_ABOUT);
     Bind(wxEVT_MENU, [this](wxCommandEvent& e) { SetView((ChartKind) (e.GetId() - ID_VIEW_TIMELINE)); },
          ID_VIEW_TIMELINE, ID_VIEW_FREQUENCY);
+    Bind(wxEVT_MENU, &MainFrame::OnSelectAll, this, wxID_SELECTALL);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+        m_doc.SetSelection(std::nullopt);
+        SelectionChanged();
+    }, ID_DESELECT);
+    Bind(wxEVT_MENU, &MainFrame::OnIncludeSelection, this, ID_EXCLUDE_SELECTION, ID_INCLUDE_SELECTION);
+    Bind(wxEVT_MENU, &MainFrame::OnZoom, this, ID_ZOOM_IN, ID_FIT_VERTICAL);
+    Bind(wxEVT_MENU, [this](wxCommandEvent& e) { LockVertical(e.IsChecked()); }, ID_LOCK_VERTICAL);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowSidebar(!m_outer->IsSplit()); }, ID_TOGGLE_SIDEBAR);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowInspector(!m_inner->IsSplit()); }, ID_TOGGLE_INSPECTOR);
 
@@ -235,6 +269,35 @@ void MainFrame::BuildMenus()
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
         e.Check(e.GetId() - ID_VIEW_TIMELINE == (int) m_settings.view);
     }, ID_VIEW_TIMELINE, ID_VIEW_FREQUENCY);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_doc.Selection().has_value()); },
+         ID_DESELECT, ID_INCLUDE_SELECTION);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        e.Enable(m_doc.Selection().has_value() && m_settings.view == ChartKind::Timeline);
+    }, ID_ZOOM_SELECTION);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        SessionView *v = m_doc.View();
+        bool timeline = v && m_settings.view == ChartKind::Timeline;
+        switch (e.GetId())
+        {
+        case ID_ZOOM_IN:
+            e.Enable(timeline && v->horizontal.CanZoomIn());
+            break;
+        case ID_ZOOM_OUT:
+        case ID_ZOOM_FIT:
+            e.Enable(timeline && v->horizontal.CanZoomOut());
+            break;
+        default:
+            e.Enable(timeline);
+        }
+    }, ID_ZOOM_IN, ID_ZOOM_FIT);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        e.Enable(m_doc.Session() && m_settings.view == ChartKind::Timeline);
+    }, ID_FIT_VERTICAL);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
+        e.Enable(m_doc.Session() != nullptr);
+        e.Check(m_doc.VerticalScaleLocked());
+    }, ID_LOCK_VERTICAL);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_doc.Session() != nullptr); }, wxID_SELECTALL);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Check(m_outer->IsSplit()); }, ID_TOGGLE_SIDEBAR);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Check(m_inner->IsSplit()); }, ID_TOGGLE_INSPECTOR);
 }
@@ -276,7 +339,7 @@ void MainFrame::BuildLayout()
     m_inner->SetSashGravity(1.);
     m_inner->SetMinimumPaneSize(FromDIP(220));
 
-    m_chart = new ChartView(m_inner);
+    m_chart = new ChartView(m_inner, *this);
     m_inspector = new Inspector(m_inner);
 
     // the panes are split once the frame has its size
@@ -286,10 +349,8 @@ void MainFrame::BuildLayout()
     m_inner->Initialize(m_chart);
 
     m_sidebar->onSelect = [this](size_t section) { SelectSection(section); };
-    m_inspector->onUnits = [this](Units units) {
-        m_settings.display.units = units;
-        UpdateAll();
-    };
+    m_inspector->onDisplay = [this](const DisplayOptions& options) { SetDisplay(options); };
+    m_inspector->onLockVertical = [this](bool lock) { LockVertical(lock); };
     m_inspector->onExclusions = [this](const ExclusionSettings& rules) {
         ExclusionSettings x = rules;
         x.settle = m_settings.exclusions.settle;
@@ -303,7 +364,8 @@ void MainFrame::BuildLayout()
     };
 
     // let a log be dropped on the chart too
-    m_chart->Canvas()->SetDropTarget(new FileDropTarget(this));
+    for (wxWindow *w : m_chart->DropTargets())
+        w->SetDropTarget(new FileDropTarget(this));
 }
 
 void MainFrame::ApplyPalette()
@@ -311,7 +373,7 @@ void MainFrame::ApplyPalette()
     m_palette = CurrentPalette(m_settings.raColor, m_settings.decColor);
     m_sidebar->SetPalette(m_palette);
     m_inspector->SetPalette(m_palette);
-    m_chart->SetPalette(m_palette);
+    m_chart->ApplyPalette();
     m_views->SetPalette(m_palette);
     UpdateToolIcons();
 }
@@ -356,6 +418,7 @@ void MainFrame::Open(const wxString& path)
             m_doc.Select(i);
             break;
         }
+    ChooseDevice();
 
     UpdateAll();
 
@@ -487,7 +550,117 @@ void MainFrame::OnAbout(wxCommandEvent&)
 void MainFrame::SelectSection(size_t section)
 {
     m_doc.Select(section);
+    ChooseDevice();
+    m_chart->Timeline()->ClearHover();
     UpdateAll();
+}
+
+// Shows the pulses of the device a session guided with. Only a session
+// that used both an AO and a mount offers the choice.
+void MainFrame::ChooseDevice()
+{
+    const GuideSession *s = m_doc.Session();
+    if (!s || HasBothDevices(*s))
+        return;
+    bool ao = std::any_of(s->entries.begin(), s->entries.end(), [](const GuideEntry& e) { return e.mount == AO; });
+    m_settings.display.device = ao ? AO : MOUNT;
+}
+
+void MainFrame::SetDisplay(const DisplayOptions& options)
+{
+    if (options.xaxis != m_settings.display.xaxis)
+        m_doc.SetXAxis(options.xaxis);
+    m_settings.display = options;
+    UpdateAll();
+}
+
+void MainFrame::LockVertical(bool lock)
+{
+    m_doc.LockVerticalScale(lock);
+    m_settings.verticalLock = m_doc.VerticalLock();
+    m_inspector->ShowDocument(m_doc, m_settings);
+    m_chart->RefreshChart();
+}
+
+void MainFrame::OnSelectAll(wxCommandEvent& event)
+{
+    if (auto text = dynamic_cast<wxTextCtrl *>(FindFocus()))
+    {
+        text->SelectAll();
+        return;
+    }
+    const GuideSession *s = m_doc.Session();
+    if (!s || s->entries.empty())
+    {
+        event.Skip();
+        return;
+    }
+    m_doc.SetSelection(IndexRun{ 0, (unsigned int) s->entries.size() - 1 });
+    SelectionChanged();
+}
+
+void MainFrame::OnIncludeSelection(wxCommandEvent& event)
+{
+    m_doc.IncludeSelection(event.GetId() == ID_INCLUDE_SELECTION);
+    FramesChanged();
+}
+
+void MainFrame::OnZoom(wxCommandEvent& event)
+{
+    TimelineCanvas *t = m_chart->Timeline();
+    switch (event.GetId())
+    {
+    case ID_ZOOM_IN:
+        t->ZoomBy(2.);
+        break;
+    case ID_ZOOM_OUT:
+        t->ZoomBy(0.5);
+        break;
+    case ID_ZOOM_FIT:
+        t->ZoomToFit();
+        break;
+    case ID_ZOOM_SELECTION:
+        t->ZoomToSelection();
+        break;
+    case ID_FIT_VERTICAL:
+        t->FitVertical();
+        break;
+    }
+}
+
+void MainFrame::FramesChanged()
+{
+    UpdateAll();
+}
+
+void MainFrame::SelectionChanged()
+{
+    m_inspector->ShowDocument(m_doc, m_settings);
+    m_chart->RefreshChart();
+}
+
+void MainFrame::ViewChanged()
+{
+    UpdateSubtitle();
+    m_chart->RefreshChart();
+}
+
+void MainFrame::ShowStatus(const wxString& text)
+{
+    m_chart->ShowStatus(text);
+}
+
+void MainFrame::UpdateSubtitle()
+{
+    const GuideSession *s = m_doc.Session();
+    SessionView *v = m_chart->Timeline()->View();
+    if (!s || !v || m_settings.view != ChartKind::Timeline || s->entries.empty())
+        return;
+    const auto& e = s->entries;
+    XAxis axis = m_doc.GetXAxis();
+    double t0 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.First(), axis), XAxis::Time);
+    double t1 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.Last(), axis), XAxis::Time);
+    m_chart->SetHeading(U(SectionTitle(m_doc.Log(), *m_doc.Current())), U(VisibleRange(*s, t0, t1)));
 }
 
 void MainFrame::SetView(ChartKind view)
@@ -556,11 +729,12 @@ void MainFrame::UpdateChart()
     if (!m_doc.Current())
     {
         m_chart->SetHeading(wxEmptyString, wxEmptyString);
-        m_chart->SetStatus(wxEmptyString);
+        m_chart->SetLegend(wxEmptyString, wxEmptyString);
+        m_chart->SetDefaultStatus(wxEmptyString);
         if (m_path.empty())
-            m_chart->SetMessage("Open a PHD2 guide log", wxString::FromUTF8("Choose File › Open, or drag a log file here"));
+            m_chart->ShowMessage("Open a PHD2 guide log", wxString::FromUTF8("Choose File › Open, or drag a log file here"));
         else
-            m_chart->SetMessage("This log has no calibrations or guiding");
+            m_chart->ShowMessage("This log has no calibrations or guiding");
         return;
     }
 
@@ -568,12 +742,30 @@ void MainFrame::UpdateChart()
     m_chart->SetHeading(U(SectionTitle(m_doc.Log(), section)), wxEmptyString);
     if (m_doc.CalibrationSection())
     {
-        m_chart->SetMessage("Calibration");
-        m_chart->SetStatus(wxEmptyString);
+        m_chart->SetLegend(wxEmptyString, wxEmptyString);
+        m_chart->SetDefaultStatus(wxEmptyString);
+        m_chart->ShowMessage("Calibration");
         return;
     }
-    m_chart->SetMessage(VIEW_NAMES[(int) m_settings.view]);
-    m_chart->SetStatus(wxString::Format("%zu frames", m_doc.Session()->entries.size()));
+
+    bool radec = m_settings.display.raDecAxes;
+    m_chart->SetLegend(radec ? "RA" : "dx", radec ? "Dec" : "dy");
+    if (m_settings.view != ChartKind::Timeline)
+    {
+        m_chart->SetDefaultStatus(wxEmptyString);
+        m_chart->ShowMessage(VIEW_NAMES[(int) m_settings.view]);
+        return;
+    }
+
+    m_chart->SetDefaultStatus(wxString::FromUTF8(
+#ifdef __WXOSX__
+        "Drag to select · ⌘-drag to exclude · ⇧-drag to include · pinch to zoom"
+#else
+        "Drag to select · Ctrl-drag to exclude · Shift-drag to include · Ctrl-scroll to zoom"
+#endif
+        ));
+    m_chart->ShowTimeline();
+    UpdateSubtitle();
 }
 
 void MainFrame::SaveLayout()

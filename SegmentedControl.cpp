@@ -36,7 +36,7 @@ SegmentedControl::SegmentedControl(wxWindow *parent, wxWindowID id, const std::v
 {
     // draw over the parent's background where the platform allows it; the
     // style has to be set before the window is created
-    SetBackgroundStyle(IsTransparentBackgroundSupported() ? wxBG_STYLE_TRANSPARENT : wxBG_STYLE_PAINT);
+    PaintOverParent(this);
     Create(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxWANTS_CHARS, wxDefaultValidator, name);
     Measure();
     SetInitialSize(DoGetBestSize());
@@ -103,11 +103,7 @@ void SegmentedControl::Choose(int segment)
 void SegmentedControl::OnPaint(wxPaintEvent&)
 {
     wxAutoBufferedPaintDC dc(this);
-    if (GetBackgroundStyle() != wxBG_STYLE_TRANSPARENT)
-    {
-        dc.SetBackground(GetParent()->GetBackgroundColour());
-        dc.Clear();
-    }
+    ClearToParent(this, dc);
 
     std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
     if (!gc)

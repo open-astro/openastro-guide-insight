@@ -23,6 +23,7 @@
 #include "SegmentedControl.h"
 #include "labels.h"
 #include "sessiondetails.h"
+#include "timeline.h"
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
@@ -33,6 +34,7 @@
 #include <wx/wupdlock.h>
 
 #include <algorithm>
+#include <initializer_list>
 #include <vector>
 
 namespace {
@@ -128,17 +130,60 @@ Inspector::Inspector(wxWindow *parent)
     m_display = AddSection("Display", false);
     {
         wxWindow *p = m_display.body;
+        auto s = new wxBoxSizer(wxVERTICAL);
         auto grid = FieldGrid();
-        wxStaticText *label = Secondary(new wxStaticText(p, wxID_ANY, "Units"));
-        m_labels.push_back(label);
-        grid->Add(label, 0, wxALIGN_CENTER_VERTICAL);
-        m_units = new SegmentedControl(p, wxID_ANY, { "arc-sec", "pixels" }, "Units");
-        grid->Add(m_units);
-        m_units->Bind(wxEVT_CHOICE, [this](wxCommandEvent& event) {
-            if (onUnits)
-                onUnits(event.GetInt() == 0 ? Units::ArcSeconds : Units::Pixels);
+        auto choice = [&](const wxString& label, std::initializer_list<wxString> options, wxStaticText **name = nullptr) {
+            wxStaticText *t = Secondary(new wxStaticText(p, wxID_ANY, label));
+            m_labels.push_back(t);
+            grid->Add(t, 0, wxALIGN_CENTER_VERTICAL);
+            auto control = new SegmentedControl(p, wxID_ANY, options, label);
+            grid->Add(control);
+            control->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) {
+                if (onDisplay)
+                    onDisplay(Options());
+            });
+            if (name)
+                *name = t;
+            return control;
+        };
+        m_units = choice("Units", { "arc-sec", "pixels" });
+        m_axes = choice("Axes", { "RA/Dec", "dx/dy" });
+        m_xaxis = choice("Across", { "Frames", "Time" });
+        m_device = choice("Pulses", { "Mount", "AO" }, &m_deviceLabel);
+        m_axes->SetToolTip("Mount axes (RA and Dec) or the camera's axes (dx and dy)");
+        m_xaxis->SetToolTip("Space frames evenly, or by when they were taken");
+        m_device->SetToolTip("Whose guide pulses and limits to show");
+        s->Add(grid, 0, wxEXPAND);
+
+        auto series = new wxGridSizer(2, wxSize(FromDIP(12), FromDIP(4)));
+        auto check = [&](const wxString& label, const wxString& tip) {
+            auto cb = new wxCheckBox(p, wxID_ANY, label);
+            cb->SetToolTip(tip);
+            series->Add(cb);
+            cb->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+                if (onDisplay)
+                    onDisplay(Options());
+            });
+            return cb;
+        };
+        m_showRa = check("RA", "Show the RA (or dx) offset");
+        m_showDec = check("Dec", "Show the Dec (or dy) offset");
+        m_corrections = check("Guide pulses", "Show each guide pulse as a bar");
+        m_events = check("Events", "Show events such as dithers, settling and setting changes");
+        m_grid = check("Grid", "Show grid lines and times");
+        m_limits = check("Limits", "Show the minimum move and the longest pulse");
+        m_mass = check("Star mass", "Show the guide star's mass (brightness)");
+        m_snr = check("SNR", "Show the guide star's signal-to-noise ratio");
+        s->Add(series, 0, wxEXPAND | wxTOP, FromDIP(10));
+
+        m_lock = new wxCheckBox(p, wxID_ANY, "Lock vertical scale");
+        m_lock->SetToolTip("Use the same vertical scale, in arc-seconds, for every session");
+        m_lock->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& e) {
+            if (onLockVertical)
+                onLockVertical(e.IsChecked());
         });
-        p->SetSizer(grid);
+        s->Add(m_lock, 0, wxTOP, FromDIP(10));
+        p->SetSizer(s);
     }
 
     // Exclusions
@@ -233,7 +278,8 @@ void Inspector::SetPalette(const Palette& palette)
         t->SetForegroundColour(palette.text2);
     for (SectionHeader *h : m_headers)
         h->SetPalette(palette);
-    m_units->SetPalette(palette);
+    for (SegmentedControl *c : { m_units, m_axes, m_xaxis, m_device })
+        c->SetPalette(palette);
     Refresh();
 }
 
@@ -241,6 +287,24 @@ void Inspector::Relayout()
 {
     Layout();
     FitInside();
+}
+
+DisplayOptions Inspector::Options() const
+{
+    DisplayOptions d = m_options;
+    d.units = m_units->GetSelection() == 0 ? Units::ArcSeconds : Units::Pixels;
+    d.raDecAxes = m_axes->GetSelection() == 0;
+    d.xaxis = m_xaxis->GetSelection() == 0 ? XAxis::Frames : XAxis::Time;
+    d.device = m_device->GetSelection() == 0 ? MOUNT : AO;
+    d.ra = m_showRa->GetValue();
+    d.dec = m_showDec->GetValue();
+    d.corrections = m_corrections->GetValue();
+    d.events = m_events->GetValue();
+    d.grid = m_grid->GetValue();
+    d.limits = m_limits->GetValue();
+    d.mass = m_mass->GetValue();
+    d.snr = m_snr->GetValue();
+    return d;
 }
 
 ExclusionSettings Inspector::Rules() const
@@ -284,7 +348,26 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
         m_decDrift->SetLabel(U(t.decDrift));
         m_paError->SetLabel(U(t.paError));
 
-        m_units->SetSelection(units == Units::ArcSeconds ? 0 : 1);
+        const DisplayOptions& d = settings.display;
+        m_options = d;
+        m_units->SetSelection(d.units == Units::ArcSeconds ? 0 : 1);
+        m_axes->SetSelection(d.raDecAxes ? 0 : 1);
+        m_xaxis->SetSelection(d.xaxis == XAxis::Frames ? 0 : 1);
+        m_device->SetSelection(d.device == MOUNT ? 0 : 1);
+        bool both = HasBothDevices(*session);
+        m_device->Show(both);
+        m_deviceLabel->Show(both);
+        m_showRa->SetValue(d.ra);
+        m_showDec->SetValue(d.dec);
+        m_corrections->SetValue(d.corrections);
+        m_events->SetValue(d.events);
+        m_grid->SetValue(d.grid);
+        m_limits->SetValue(d.limits);
+        m_mass->SetValue(d.mass);
+        m_snr->SetValue(d.snr);
+        m_showRa->SetLabel(d.raDecAxes ? "RA" : "dx");
+        m_showDec->SetLabel(d.raDecAxes ? "Dec" : "dy");
+        m_lock->SetValue(doc.VerticalScaleLocked());
 
         size_t excluded = 0;
         for (const auto& e : session->entries)

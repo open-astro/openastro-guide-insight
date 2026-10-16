@@ -89,3 +89,16 @@ Palette CurrentPalette(const std::string& raColor, const std::string& decColor)
     Override(p.dec, p.decFill, decColor);
     return p;
 }
+
+void PaintOverParent(wxWindow *window)
+{
+    window->SetBackgroundStyle(window->IsTransparentBackgroundSupported() ? wxBG_STYLE_TRANSPARENT : wxBG_STYLE_PAINT);
+}
+
+void ClearToParent(wxWindow *window, wxDC& dc)
+{
+    if (window->GetBackgroundStyle() == wxBG_STYLE_TRANSPARENT)
+        return;
+    dc.SetBackground(window->GetParent()->GetBackgroundColour());
+    dc.Clear();
+}

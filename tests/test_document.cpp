@@ -22,6 +22,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -204,6 +206,27 @@ TEST_CASE("Including or excluding all frames ignores the selection", "[document]
     CHECK(doc.Session()->rms_ra > 0.);
 }
 
+TEST_CASE("Frames can be excluded and included without selecting them", "[document]")
+{
+    Document doc = RealLog();
+    doc.Select(2);
+    doc.IncludeAll(true);
+    doc.SetSelection(IndexRun{ 0, 9 });
+    doc.IncludeFrames(IndexRun{ 50, 59 }, false);
+    CHECK(Excluded(*doc.Session()) == 10);
+    CHECK(doc.Selection()->first == 0); // the selection stays
+    doc.IncludeFrames(IndexRun{ 55, 70 }, true);
+    CHECK(Excluded(*doc.Session()) == 5);
+}
+
+TEST_CASE("A new session view has not been fitted vertically", "[document]")
+{
+    Document doc = Load(OneSession(10, 2., 4.));
+    CHECK_FALSE(doc.View()->verticalFitted);
+    doc.FitVertical(300.);
+    CHECK(doc.View()->verticalFitted);
+}
+
 TEST_CASE("A calibration has no selection, statistics or view", "[document]")
 {
     Document doc = RealLog();
@@ -267,6 +290,26 @@ TEST_CASE("Fitting the vertical view uses the largest offset", "[document]")
     CHECK(MaxOffset(*doc.Session()) == Approx(4.));
     doc.FitVertical(300.);
     CHECK(doc.View()->vertical.Scale() == Approx(35.));
+}
+
+TEST_CASE("Fitting the vertical view leaves out excluded frames", "[document]")
+{
+    // settling after a dither can be far larger than the guiding itself
+    Document doc = RealLog();
+    doc.Select(1);
+    const GuideSession& s = *doc.Session();
+    double included = 0.;
+    for (const auto& e : s.entries)
+        if (e.included)
+            included = std::max({ included, (double) fabs(e.raraw), (double) fabs(e.decraw) });
+    CHECK(MaxOffset(s) == Approx(included));
+}
+
+TEST_CASE("With every frame excluded, fitting uses them all", "[document]")
+{
+    Document doc = Load(OneSession(10, 2., 4.));
+    doc.IncludeAll(false);
+    CHECK(MaxOffset(*doc.Session()) == Approx(4.));
 }
 
 TEST_CASE("Zooming the vertical view scales the current session", "[document]")
