@@ -49,6 +49,22 @@ class MainFrame : public wxFrame, public ChartHost
     wxFileHistory m_history;
     std::unique_ptr<wxPreferencesEditor> m_preferences;
 
+    // the Drift and Frequency analysis, worked out when first asked for
+    std::unique_ptr<GARun> m_analysis;
+    unsigned m_analysisGeneration = 0;
+    bool m_analysisStale = true;
+    struct AnalysisKey
+    {
+        const GuideSession *session = nullptr;
+        IndexRun range{ 0, 0 };
+        AnalysisOptions options;
+        bool operator==(const AnalysisKey& o) const
+        {
+            return session == o.session && range.first == o.range.first && range.last == o.range.last &&
+                   options.driftCorrection == o.options.driftCorrection && options.rawRa == o.options.rawRa;
+        }
+    } m_analysisKey;
+
     wxSplitterWindow *m_outer;   // sidebar | the rest
     wxSplitterWindow *m_inner;   // chart | inspector
     SessionSidebar *m_sidebar;
@@ -90,12 +106,17 @@ class MainFrame : public wxFrame, public ChartHost
     void LockVertical(bool lock);
     void ChooseDevice();
     void UpdateSubtitle();
+    void OnExportCsv(wxCommandEvent& event);
+    void OnSelectGuidingAssistant(wxCommandEvent& event);
+    wxString AnalysisScope() const;
 
 public:
     // ChartHost
     Document& Doc() override { return m_doc; }
     const AppSettings& Settings() const override { return m_settings; }
     const Palette& Colors() const override { return m_palette; }
+    const GARun *Analysis() override;
+    unsigned AnalysisGeneration() const override { return m_analysisGeneration; }
     void FramesChanged() override;
     void SelectionChanged() override;
     void ViewChanged() override;

@@ -103,6 +103,34 @@ Inspector::Inspector(wxWindow *parent)
         p->SetSizer(grid);
     }
 
+    // Analysis, for the Drift and Frequency charts
+    m_analysis = AddSection("Analysis");
+    {
+        wxWindow *p = m_analysis.body;
+        auto s = new wxBoxSizer(wxVERTICAL);
+        m_scope = Secondary(new wxStaticText(p, wxID_ANY, wxEmptyString));
+        s->Add(m_scope, 0, wxBOTTOM, FromDIP(6));
+        m_driftCorrection = new wxCheckBox(p, wxID_ANY, "Remove drift");
+        m_driftCorrection->SetToolTip("Take a straight-line drift out of RA and Dec before analysing them");
+        m_rawRa = new wxCheckBox(p, wxID_ANY, "Add back RA guide pulses");
+        m_rawRa->SetToolTip("Analyse RA as it would have moved without guiding, by adding the RA pulses back");
+        for (wxCheckBox *cb : { m_driftCorrection, m_rawRa })
+        {
+            s->Add(cb, 0, wxBOTTOM, FromDIP(4));
+            cb->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+                if (onAnalysis)
+                    onAnalysis(AnalysisOptions{ m_driftCorrection->GetValue(), m_rawRa->GetValue() });
+            });
+        }
+        m_selectGa = new wxButton(p, wxID_ANY, "Select Guiding Assistant Run");
+        m_selectGa->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+            if (onSelectGuidingAssistant)
+                onSelectGuidingAssistant();
+        });
+        s->Add(m_selectGa, 0, wxTOP, FromDIP(4));
+        p->SetSizer(s);
+    }
+
     // Calibration results
     m_calibration = AddSection("Calibration");
     {
@@ -359,6 +387,20 @@ void Inspector::ShowDocument(const Document& doc, const AppSettings& settings)
     for (Section *s : { &m_summary, &m_drift, &m_display, &m_exclusions })
         s->Show(session != nullptr);
     m_calibration.Show(cal != nullptr);
+    bool analysing = session && (settings.view == ChartKind::Drift || settings.view == ChartKind::Frequency);
+    m_analysis.Show(analysing);
+    if (analysing)
+    {
+        const auto& sel = doc.Selection();
+        size_t begin = sel ? sel->first : 0, end = sel ? sel->last + 1 : session->entries.size();
+        wxString scope = sel ? wxString::Format("Frames %u to %u", sel->first + 1, sel->last + 1) : wxString("Whole session");
+        if (!GARun::CanAnalyze(*session, begin, end))
+            scope += wxString::FromUTF8(" \u00b7 too few frames: analysis needs 12 that count");
+        m_scope->SetLabel(scope);
+        m_driftCorrection->SetValue(settings.analysis.driftCorrection);
+        m_rawRa->SetValue(settings.analysis.rawRa);
+        m_selectGa->Show(!GuidingAssistantRuns(*session).empty());
+    }
     m_details.Show(section != nullptr);
     if (cal)
         FillFields(m_calibration.body, m_calibrationGrid, CalibrationDetails(*cal));
