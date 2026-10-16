@@ -194,10 +194,21 @@ jobs:
         run: cmake --install out/build/${{ matrix.preset }} --config Release --prefix stage
 
       - name: Package artifact
-        run: tar -C stage -czf ${{ matrix.artifact }}.tar.gz .
+        run: |
+          version=$(cat out/build/${{ matrix.preset }}/version.txt)
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            # an ad-hoc signed disk image with an Applications link
+            package=openastro-guide-insight-$version-macos-arm64.dmg
+            scripts/make-dmg.sh "stage/OpenAstro Guide Insight.app" "$package"
+            scripts/check-dmg.sh "$package"
+          else
+            package=${{ matrix.artifact }}.tar.gz
+            tar -C stage -czf "$package" .
+          fi
+          echo "PACKAGE=$package" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.tar.gz
+          path: ${{ env.PACKAGE }}
           if-no-files-found: error
