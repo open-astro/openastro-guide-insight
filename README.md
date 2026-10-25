@@ -38,9 +38,9 @@ The downloads are not signed yet, so the first launch needs a nudge:
 
 ## Using it
 
-Choose **File › Open**, or drag a log onto the window. PHD2 writes its logs to Documents/PHD2 by default.
+Choose **File › Open** to select one or more logs, or drag logs onto the window. Opened logs stay in the Sessions tree; select a log or one of its sessions to show it in the chart and inspector. Right-click a log or choose **File › Close Log** to close it. PHD2 writes its logs to Documents/PHD2 by default.
 
-- The **sidebar** lists the log's sessions. The **toolbar** switches the chart between Timeline, Scatter, Drift and Frequency.
+- The **sidebar** groups each open log above its sessions; expand or collapse a log with its disclosure arrow. Sessions can be combined only within the same log. The **toolbar** switches the chart between Timeline, Scatter, Drift and Frequency.
 - The **inspector** on the right starts with an **assessment**: how good the guiding was, why the RMS is what it is, and which settings to try, and compares the night with earlier ones in the same folder. Below it are the statistics, the session's equipment and settings, display options, and the exclusion rules.
 - On the Timeline, scroll to pan, and pinch or ⌘/Ctrl-scroll to zoom. Drag to select frames; ⌘/Ctrl-drag excludes them and Shift-drag includes them.
 

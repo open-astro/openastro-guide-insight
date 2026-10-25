@@ -74,6 +74,8 @@ TEST_CASE("Signed numbers show their sign either way", "[labels]")
 TEST_CASE("Numbers use a decimal point in every locale", "[labels]")
 {
     CommaDecimalLocale comma;
+    if (!comma.Active())
+        SKIP("no locale with a decimal comma is installed");
     CHECK(Fixed(1.5, 1) == "1.5");
 }
 
@@ -239,6 +241,8 @@ TEST_CASE("The subtitle says how much of the session is in view", "[labels]")
 TEST_CASE("Copied statistics are CSV with a decimal point", "[labels]")
 {
     CommaDecimalLocale comma;
+    if (!comma.Active())
+        SKIP("no locale with a decimal comma is installed");
     CHECK(StatsCsv(Stats(), 2.) ==
           "Statistic,arc-sec,pixels\n"
           "RA RMS,0.40,0.20\n"

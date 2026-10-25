@@ -50,6 +50,7 @@ enum
     ID_SELECT_GA,
     ID_PREVIOUS_SECTION,
     ID_NEXT_SECTION,
+    ID_CLOSE_LOG,
 };
 
 #endif

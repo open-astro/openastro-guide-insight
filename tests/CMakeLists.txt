@@ -31,6 +31,8 @@ add_executable(guideinsight_tests
   test_assessment.cpp
   test_catalogue.cpp
   test_nights.cpp
+  test_sidebar.cpp
+  test_workspace.cpp
 )
 target_link_libraries(guideinsight_tests PRIVATE guideinsight_core Catch2::Catch2)
 guideinsight_warnings(guideinsight_tests)
@@ -49,7 +51,8 @@ if(TARGET Catch2::Catch2 AND NOT COMMAND catch_discover_tests)
   list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 endif()
 include(Catch)
-catch_discover_tests(guideinsight_tests DISCOVERY_MODE PRE_TEST)
+catch_discover_tests(guideinsight_tests DISCOVERY_MODE PRE_TEST
+  PROPERTIES SKIP_RETURN_CODE 4)
 
 # Build policy checks for the macOS app bundle: native Apple Silicon only,
 # and the supported minimum macOS version.

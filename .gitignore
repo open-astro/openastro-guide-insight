@@ -3,3 +3,11 @@ TAGS
 out/
 vcpkg_installed/
 .DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.kate-swp
+*~

@@ -123,6 +123,8 @@ add_library(guideinsight_core STATIC
   selection.h
   document.cpp
   document.h
+  workspace.cpp
+  workspace.h
   labels.cpp
   labels.h
   appsettings.cpp

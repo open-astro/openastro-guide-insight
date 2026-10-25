@@ -51,8 +51,6 @@
 #include <wx/toolbar.h>
 #include <wx/utils.h>
 
-#include <fstream>
-
 #define APP_NAME "OpenAstro Guide Insight"
 
 namespace {
@@ -67,7 +65,8 @@ struct FileDropTarget : public wxFileDropTarget
     {
         if (filenames.empty())
             return false;
-        m_frame->Open(filenames[0]);
+        for (const wxString& filename : filenames)
+            m_frame->Open(filename);
         return true;
     }
 };
@@ -86,14 +85,16 @@ const char *HELP_HTML =
 
     "<h3>Opening a guide log</h3>"
     "<p>Choose <b>File &rsaquo; Open</b> (CMD+O) or <b>Open Recent</b>, drag a <i>PHD2_GuideLog</i> file onto the "
-    "window, or open one from the command line. PHD2 keeps its logs in its own folder, Documents/PHD2 by "
+    "window. Select several files in the Open dialog, or pass several paths on the command line. PHD2 keeps "
+    "its logs in its own folder, Documents/PHD2 by "
     "default. A debug log is not a guide log; the app says so if you open one.</p>"
 
     "<h3>The window</h3>"
     "<ul>"
-    "<li>The <b>sidebar</b> lists the log's calibrations and guiding sessions with their start, length and total RMS. "
-    "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between them. CMD-click or "
-    "SHIFT-click several guiding sessions to see them as one, at their clock times, with statistics for them all.</li>"
+    "<li>The <b>sidebar</b> groups each open log above its calibrations and guiding sessions. Expand or collapse "
+    "logs with the disclosure arrows; right-click a log or use <b>File &rsaquo; Close Log</b> to close it. "
+    "Use the arrow keys there, or CMD+OPT+Up and Down anywhere, to move between sessions. CMD-click or "
+    "SHIFT-click several guiding sessions in one log to see them as one; sessions from different logs are not combined.</li>"
     "<li>The <b>toolbar</b> switches the chart between Timeline, Scatter, Drift and Frequency (CMD+1 to CMD+4).</li>"
     "<li>The <b>inspector</b> shows the assessment, the statistics, drift and polar alignment, the session's "
     "equipment and settings (with the raw header), display options, analysis options and exclusion rules.</li>"
@@ -191,9 +192,9 @@ MainFrame::MainFrame()
       m_settings(LoadSettings(*wxConfig::Get())),
       m_palette(CurrentPalette(m_settings.raColor, m_settings.decColor))
 {
-    m_doc.SetExclusions(m_settings.exclusions);
-    m_doc.SetVerticalLock(m_settings.verticalLock);
-    m_doc.SetXAxis(m_settings.display.xaxis);
+    Doc().SetExclusions(m_settings.exclusions);
+    Doc().SetVerticalLock(m_settings.verticalLock);
+    Doc().SetXAxis(m_settings.display.xaxis);
 
     BuildMenus();
     BuildToolbar();
@@ -240,6 +241,7 @@ void MainFrame::BuildMenus()
     file->Append(wxID_OPEN, "&Open...\tCtrl+O");
     auto recent = new wxMenu;
     file->AppendSubMenu(recent, "Open &Recent");
+    file->Append(ID_CLOSE_LOG, "&Close Log");
     file->AppendSeparator();
     file->Append(ID_OPEN_IN_EDITOR, "Open in &Text Editor", "Open the log file in your text editor");
     file->Append(ID_EXPORT_CSV, "&Export Periodogram as CSV...", "Save the Frequency chart's periods and amplitudes");
@@ -316,6 +318,8 @@ void MainFrame::BuildMenus()
     config->SetPath("/");
 
     Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
+    Bind(wxEVT_MENU, [this](wxCommandEvent&) { CloseLog(m_workspace.ActiveIndex()); }, ID_CLOSE_LOG);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_workspace.Size() > 0); }, ID_CLOSE_LOG);
     Bind(wxEVT_MENU, &MainFrame::OnOpenRecent, this, wxID_FILE1, wxID_FILE9);
     Bind(wxEVT_MENU, &MainFrame::OnOpenInEditor, this, ID_OPEN_IN_EDITOR);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_CLOSE);
@@ -330,28 +334,28 @@ void MainFrame::BuildMenus()
     Bind(wxEVT_MENU, &MainFrame::OnSelectAll, this, wxID_SELECTALL);
     Bind(wxEVT_MENU, &MainFrame::OnExportCsv, this, ID_EXPORT_CSV);
     Bind(wxEVT_MENU, [this](wxCommandEvent& e) {
-        if (!m_doc.Current())
+        if (!Doc().Current())
             return;
-        size_t current = *m_doc.Current();
+        size_t current = *Doc().Current();
         if (e.GetId() == ID_PREVIOUS_SECTION && current > 0)
             SelectSection(current - 1);
-        else if (e.GetId() == ID_NEXT_SECTION && current + 1 < m_doc.Log().sections.size())
+        else if (e.GetId() == ID_NEXT_SECTION && current + 1 < Doc().Log().sections.size())
             SelectSection(current + 1);
     }, ID_PREVIOUS_SECTION, ID_NEXT_SECTION);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        auto current = m_doc.Current();
+        auto current = Doc().Current();
         e.Enable(current && (e.GetId() == ID_PREVIOUS_SECTION ? *current > 0
-                                                              : *current + 1 < m_doc.Log().sections.size()));
+                                                              : *current + 1 < Doc().Log().sections.size()));
     }, ID_PREVIOUS_SECTION, ID_NEXT_SECTION);
     Bind(wxEVT_MENU, &MainFrame::OnSelectGuidingAssistant, this, ID_SELECT_GA);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
         e.Enable(m_settings.view == ChartKind::Frequency && Analysis() != nullptr);
     }, ID_EXPORT_CSV);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        e.Enable(m_doc.Session() && !GuidingAssistantRuns(*m_doc.Session()).empty());
+        e.Enable(Doc().Session() && !GuidingAssistantRuns(*Doc().Session()).empty());
     }, ID_SELECT_GA);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-        m_doc.SetSelection(std::nullopt);
+        Doc().SetSelection(std::nullopt);
         SelectionChanged();
     }, ID_DESELECT);
     Bind(wxEVT_MENU, &MainFrame::OnIncludeSelection, this, ID_EXCLUDE_SELECTION, ID_INCLUDE_SELECTION);
@@ -360,19 +364,19 @@ void MainFrame::BuildMenus()
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowSidebar(!m_outer->IsSplit()); }, ID_TOGGLE_SIDEBAR);
     Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowInspector(!m_inner->IsSplit()); }, ID_TOGGLE_INSPECTOR);
 
-    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(!m_path.empty()); }, ID_OPEN_IN_EDITOR);
-    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_doc.Session() != nullptr); },
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(!m_workspace.ActivePath().empty()); }, ID_OPEN_IN_EDITOR);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(Doc().Session() != nullptr); },
          ID_INCLUDE_ALL, ID_REAPPLY_RULES);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
         e.Check(e.GetId() - ID_VIEW_TIMELINE == (int) m_settings.view);
     }, ID_VIEW_TIMELINE, ID_VIEW_FREQUENCY);
-    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_doc.Selection().has_value()); },
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(Doc().Selection().has_value()); },
          ID_DESELECT, ID_INCLUDE_SELECTION);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        e.Enable(m_doc.Selection().has_value() && m_settings.view == ChartKind::Timeline);
+        e.Enable(Doc().Selection().has_value() && m_settings.view == ChartKind::Timeline);
     }, ID_ZOOM_SELECTION);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        Chart *chart = m_doc.Current() ? m_chart->ActiveChart() : nullptr;
+        Chart *chart = Doc().Current() ? m_chart->ActiveChart() : nullptr;
         switch (e.GetId())
         {
         case ID_ZOOM_IN:
@@ -385,13 +389,13 @@ void MainFrame::BuildMenus()
         }
     }, ID_ZOOM_IN, ID_ZOOM_FIT);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        e.Enable(m_doc.Session() && m_settings.view == ChartKind::Timeline);
+        e.Enable(Doc().Session() && m_settings.view == ChartKind::Timeline);
     }, ID_FIT_VERTICAL);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) {
-        e.Enable(m_doc.Session() != nullptr);
-        e.Check(m_doc.VerticalScaleLocked());
+        e.Enable(Doc().Session() != nullptr);
+        e.Check(Doc().VerticalScaleLocked());
     }, ID_LOCK_VERTICAL);
-    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(m_doc.Session() != nullptr); }, wxID_SELECTALL);
+    Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Enable(Doc().Session() != nullptr); }, wxID_SELECTALL);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Check(m_outer->IsSplit()); }, ID_TOGGLE_SIDEBAR);
     Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& e) { e.Check(m_inner->IsSplit()); }, ID_TOGGLE_INSPECTOR);
 }
@@ -442,7 +446,16 @@ void MainFrame::BuildLayout()
     m_outer->Initialize(m_inner);
     m_inner->Initialize(m_chart);
 
-    m_sidebar->onSelect = [this](const std::vector<size_t>& sections) { SelectSections(sections); };
+    m_sidebar->onSelect = [this](size_t log, const std::vector<size_t>& sections, bool parent) {
+        if (log != m_workspace.ActiveIndex())
+            ActivateLog(log);
+        if (!parent && !sections.empty())
+            SelectSections(sections);
+        else
+            UpdateAll();
+    };
+    m_sidebar->onCloseLog = [this](size_t log) { CloseLog(log); };
+    m_sidebar->onRefresh = [this] { UpdateAll(); };
     m_inspector->onDisplay = [this](const DisplayOptions& options) { SetDisplay(options); };
     m_inspector->onLockVertical = [this](bool lock) { LockVertical(lock); };
     m_inspector->onAnalysis = [this](const AnalysisOptions& options) {
@@ -457,15 +470,15 @@ void MainFrame::BuildLayout()
         ExclusionSettings x = rules;
         x.settle = m_settings.exclusions.settle;
         m_settings.exclusions = x;
-        m_doc.SetExclusions(x);
+        Doc().SetExclusions(x);
         UpdateAll();
     };
     m_inspector->onIncludeAll = [this](bool include) {
-        m_doc.IncludeAll(include);
+        Doc().IncludeAll(include);
         UpdateAll();
     };
     m_inspector->onShowFrames = [this](const IndexRun& run) {
-        m_doc.SetSelection(run);
+        Doc().SetSelection(run);
         SetView(ChartKind::Timeline);
         SelectionChanged();
     };
@@ -497,51 +510,30 @@ void MainFrame::OnSysColourChanged(wxSysColourChangedEvent& event)
 
 void MainFrame::Open(const wxString& path)
 {
-    std::ifstream ifs(path.fn_str());
-    if (!ifs)
-    {
-        wxLogError("Cannot open the file \"%s\".", path);
-        return;
-    }
-
     wxFileName fn(path);
-    bool ok;
+    Document *previous = &Doc();
+    bool ok = false;
     {
         wxWindowDisabler disabler;
         wxBusyInfo busy(wxString::Format("Reading %s...", fn.GetFullName()), this);
-        ok = m_doc.Load(ifs, [] { wxTheApp->Yield(true); });
+        ok = m_workspace.Open(path, m_settings.exclusions, m_settings.display.xaxis, m_settings.verticalLock,
+                              [] { wxTheApp->Yield(true); });
     }
     if (!ok)
     {
-        wxLogError("Cannot read the file \"%s\".", path);
+        wxLogError("Cannot open or read the file \"%s\".", path);
         return;
     }
 
-    m_path = path;
     m_history.AddFileToHistory(path);
     m_settings.openDir = fn.GetPath();
 
-    // tonight against earlier nights' logs in the same folder
-    std::optional<NightComparison> comparison;
+    if (previous != &Doc())
     {
-        wxBusyCursor busy;
-        std::string utf8(path.utf8_str());
-        if (std::optional<NightSummary> tonight = m_nights.Summary(utf8))
-            comparison = CompareNights(*tonight, m_nights.Summaries(GuideLogsBeside(utf8)));
+        ActivateLog(m_workspace.ActiveIndex());
+        UpdateAll();
     }
-    m_inspector->SetComparison(comparison);
-
-    // start on the first guiding session, the usual reason to open a log
-    const GuideLog& log = m_doc.Log();
-    for (size_t i = 0; i < log.sections.size(); i++)
-        if (log.sections[i].type == GUIDING_SECTION)
-        {
-            m_doc.Select(i);
-            break;
-        }
-    ChooseDevice();
-
-    UpdateAll();
+    const GuideLog& log = Doc().Log();
     // the arrow keys move between sections straight away
     m_sidebar->FocusList();
 
@@ -560,9 +552,14 @@ void MainFrame::OnOpen(wxCommandEvent&)
 {
     wxFileDialog dlg(this, "Open a PHD2 Guide Log", m_settings.openDir, wxEmptyString,
                      "PHD2 guide logs (*PHD2_GuideLog*.txt)|*PHD2_GuideLog*.txt|Text files (*.txt)|*.txt",
-                     wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+                     wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
     if (dlg.ShowModal() == wxID_OK)
-        Open(dlg.GetPath());
+    {
+        wxArrayString paths;
+        dlg.GetPaths(paths);
+        for (const wxString& path : paths)
+            Open(path);
+    }
 }
 
 void MainFrame::OnOpenRecent(wxCommandEvent& event)
@@ -579,8 +576,8 @@ void MainFrame::OnOpenRecent(wxCommandEvent& event)
 
 void MainFrame::OnOpenInEditor(wxCommandEvent&)
 {
-    if (!m_path.empty())
-        wxLaunchDefaultApplication(m_path);
+    if (!m_workspace.ActivePath().empty())
+        wxLaunchDefaultApplication(m_workspace.ActivePath());
 }
 
 void MainFrame::OnCopy(wxCommandEvent& event)
@@ -592,7 +589,7 @@ void MainFrame::OnCopy(wxCommandEvent& event)
         return;
     }
 
-    const GuideSession *session = m_doc.Session();
+    const GuideSession *session = Doc().Session();
     if (!session)
     {
         event.Skip();
@@ -600,7 +597,7 @@ void MainFrame::OnCopy(wxCommandEvent& event)
     }
     if (wxTheClipboard->Open())
     {
-        wxTheClipboard->SetData(new wxTextDataObject(U(StatsCsv(m_doc.Stats(), session->pixelScale))));
+        wxTheClipboard->SetData(new wxTextDataObject(U(StatsCsv(Doc().Stats(), session->pixelScale))));
         wxTheClipboard->Close();
     }
 }
@@ -610,13 +607,13 @@ void MainFrame::OnIncludeAll(wxCommandEvent& event)
     switch (event.GetId())
     {
     case ID_INCLUDE_ALL:
-        m_doc.IncludeAll(true);
+        Doc().IncludeAll(true);
         break;
     case ID_EXCLUDE_ALL:
-        m_doc.IncludeAll(false);
+        Doc().IncludeAll(false);
         break;
     case ID_REAPPLY_RULES:
-        m_doc.SetExclusions(m_settings.exclusions);
+        Doc().SetExclusions(m_settings.exclusions);
         break;
     }
     UpdateAll();
@@ -627,10 +624,10 @@ void MainFrame::OnPreferences(wxCommandEvent&)
     if (!m_preferences)
     {
         m_preferences = CreatePreferences(m_settings, [this] {
-            SettleParams before = m_doc.Exclusions().settle;
+            SettleParams before = Doc().Exclusions().settle;
             const SettleParams& after = m_settings.exclusions.settle;
             if (before.pixels != after.pixels || before.seconds != after.seconds)
-                m_doc.SetExclusions(m_settings.exclusions);
+                Doc().SetExclusions(m_settings.exclusions);
             ApplyPalette();
             UpdateAll();
         });
@@ -678,26 +675,68 @@ void MainFrame::SelectSection(size_t section)
 void MainFrame::SelectSections(const std::vector<size_t>& sections)
 {
     if (sections.size() == 1)
-        m_doc.Select(sections.front());
+        Doc().Select(sections.front());
     else
-        m_doc.SelectSections(sections);
+        Doc().SelectSections(sections);
     ChooseDevice();
     m_chart->Timeline()->ClearHover();
     UpdateAll();
 }
 
+void MainFrame::ActivateLog(size_t index)
+{
+    if (!m_workspace.Activate(index))
+        return;
+    Doc().SetXAxis(m_settings.display.xaxis);
+    m_analysis.reset();
+    m_analysisKey = {};
+    m_analysisStale = true;
+    ++m_analysisGeneration;
+    m_chart->Timeline()->ClearHover();
+    ChooseDevice();
+
+    std::string path(m_workspace.ActivePath().utf8_str());
+    m_settings.openDir = wxFileName(m_workspace.ActivePath()).GetPath();
+    std::optional<NightComparison> comparison;
+    {
+        wxBusyCursor busy;
+        if (std::optional<NightSummary> tonight = m_nights.Summary(path))
+            comparison = CompareNights(*tonight, m_nights.Summaries(GuideLogsBeside(path)));
+    }
+    m_inspector->SetComparison(comparison);
+}
+
+void MainFrame::CloseLog(size_t index)
+{
+    if (index >= m_workspace.Size())
+        return;
+    bool active = index == m_workspace.ActiveIndex();
+    if (active)
+    {
+        m_analysis.reset();
+        m_analysisKey = {};
+        m_analysisStale = true;
+        ++m_analysisGeneration;
+        m_chart->Timeline()->ClearHover();
+    }
+    m_workspace.Close(index);
+    if (active && m_workspace.Size())
+        ActivateLog(m_workspace.ActiveIndex());
+    UpdateAll();
+}
+
 wxString MainFrame::Heading() const
 {
-    if (m_doc.Combined())
-        return U(CombinedTitle(m_doc.Log(), m_doc.Sections()));
-    return m_doc.Current() ? U(SectionTitle(m_doc.Log(), *m_doc.Current())) : wxString();
+    if (Doc().Combined())
+        return U(CombinedTitle(Doc().Log(), Doc().Sections()));
+    return Doc().Current() ? U(SectionTitle(Doc().Log(), *Doc().Current())) : wxString();
 }
 
 // Shows the pulses of the device a session guided with. Only a session
 // that used both an AO and a mount offers the choice.
 void MainFrame::ChooseDevice()
 {
-    const GuideSession *s = m_doc.Session();
+    const GuideSession *s = Doc().Session();
     if (!s || HasBothDevices(*s))
         return;
     bool ao = std::any_of(s->entries.begin(), s->entries.end(), [](const GuideEntry& e) { return e.mount == AO; });
@@ -707,16 +746,16 @@ void MainFrame::ChooseDevice()
 void MainFrame::SetDisplay(const DisplayOptions& options)
 {
     if (options.xaxis != m_settings.display.xaxis)
-        m_doc.SetXAxis(options.xaxis);
+        Doc().SetXAxis(options.xaxis);
     m_settings.display = options;
     UpdateAll();
 }
 
 void MainFrame::LockVertical(bool lock)
 {
-    m_doc.LockVerticalScale(lock);
-    m_settings.verticalLock = m_doc.VerticalLock();
-    m_inspector->ShowDocument(m_doc, m_settings);
+    Doc().LockVerticalScale(lock);
+    m_settings.verticalLock = Doc().VerticalLock();
+    m_inspector->ShowDocument(Doc(), m_settings);
     m_chart->RefreshChart();
 }
 
@@ -727,19 +766,19 @@ void MainFrame::OnSelectAll(wxCommandEvent& event)
         text->SelectAll();
         return;
     }
-    const GuideSession *s = m_doc.Session();
+    const GuideSession *s = Doc().Session();
     if (!s || s->entries.empty())
     {
         event.Skip();
         return;
     }
-    m_doc.SetSelection(IndexRun{ 0, (unsigned int) s->entries.size() - 1 });
+    Doc().SetSelection(IndexRun{ 0, (unsigned int) s->entries.size() - 1 });
     SelectionChanged();
 }
 
 void MainFrame::OnIncludeSelection(wxCommandEvent& event)
 {
-    m_doc.IncludeSelection(event.GetId() == ID_INCLUDE_SELECTION);
+    Doc().IncludeSelection(event.GetId() == ID_INCLUDE_SELECTION);
     FramesChanged();
 }
 
@@ -776,7 +815,7 @@ void MainFrame::FramesChanged()
 
 void MainFrame::SelectionChanged()
 {
-    m_inspector->ShowDocument(m_doc, m_settings);
+    m_inspector->ShowDocument(Doc(), m_settings);
     if (m_settings.view != ChartKind::Timeline)
         UpdateChart();
     m_chart->RefreshChart();
@@ -795,12 +834,12 @@ void MainFrame::ShowStatus(const wxString& text)
 
 void MainFrame::UpdateSubtitle()
 {
-    const GuideSession *s = m_doc.Session();
+    const GuideSession *s = Doc().Session();
     SessionView *v = m_chart->Timeline()->View();
     if (!s || !v || m_settings.view != ChartKind::Timeline || s->entries.empty())
         return;
     const auto& e = s->entries;
-    XAxis axis = m_doc.GetXAxis();
+    XAxis axis = Doc().GetXAxis();
     double t0 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.First(), axis), XAxis::Time);
     double t1 = PositionAtIndex(e, IndexAtPosition(e, v->horizontal.Last(), axis), XAxis::Time);
     m_chart->SetHeading(Heading(), U(VisibleRange(*s, t0, t1)));
@@ -810,19 +849,19 @@ void MainFrame::SetView(ChartKind view)
 {
     m_settings.view = view;
     m_views->SetSelection((int) view);
-    m_inspector->ShowDocument(m_doc, m_settings);
+    m_inspector->ShowDocument(Doc(), m_settings);
     UpdateChart();
 }
 
 const GARun *MainFrame::Analysis()
 {
-    const GuideSession *s = m_doc.Session();
+    const GuideSession *s = Doc().Session();
     if (!s || s->entries.empty())
         return nullptr;
 
     AnalysisKey key;
     key.session = s;
-    key.range = m_doc.Selection() ? *m_doc.Selection() : IndexRun{ 0, (unsigned int) s->entries.size() - 1 };
+    key.range = Doc().Selection() ? *Doc().Selection() : IndexRun{ 0, (unsigned int) s->entries.size() - 1 };
     key.options = m_settings.analysis;
     if (m_analysisStale || !(key == m_analysisKey))
     {
@@ -842,7 +881,7 @@ const GARun *MainFrame::Analysis()
 
 wxString MainFrame::AnalysisScope() const
 {
-    const auto& sel = m_doc.Selection();
+    const auto& sel = Doc().Selection();
     return sel ? wxString::Format("frames %u to %u", sel->first + 1, sel->last + 1) : wxString("whole session");
 }
 
@@ -865,21 +904,21 @@ void MainFrame::OnExportCsv(wxCommandEvent&)
 // already selected.
 void MainFrame::OnSelectGuidingAssistant(wxCommandEvent&)
 {
-    const GuideSession *s = m_doc.Session();
+    const GuideSession *s = Doc().Session();
     if (!s)
         return;
     std::vector<IndexRun> runs = GuidingAssistantRuns(*s);
     if (runs.empty())
         return;
     IndexRun next = runs.front();
-    if (const auto& sel = m_doc.Selection())
+    if (const auto& sel = Doc().Selection())
         for (const IndexRun& r : runs)
             if (r.first > sel->first)
             {
                 next = r;
                 break;
             }
-    m_doc.SetSelection(next);
+    Doc().SetSelection(next);
     SelectionChanged();
 }
 
@@ -915,37 +954,37 @@ void MainFrame::ShowInspector(bool show)
 void MainFrame::UpdateAll()
 {
     m_analysisStale = true;
-    m_sidebar->SetLog(m_doc.Log(), m_doc.Sections(), m_settings.display.units);
-    m_inspector->ShowDocument(m_doc, m_settings);
+    m_sidebar->SetWorkspace(m_workspace, m_settings.display.units);
+    m_inspector->ShowDocument(Doc(), m_settings);
     UpdateTitle();
     UpdateChart();
 }
 
 void MainFrame::UpdateTitle()
 {
-    if (m_path.empty())
+    if (m_workspace.ActivePath().empty())
     {
         SetTitle(APP_NAME);
         return;
     }
-    wxString title = wxFileName(m_path).GetFullName();
+    wxString title = wxFileName(m_workspace.ActivePath()).GetFullName();
 #ifndef __WXOSX__
     title += wxString::FromUTF8(" — " APP_NAME);
 #endif
     SetTitle(title);
 #ifdef __WXOSX__
-    SetRepresentedFilename(m_path);
+    SetRepresentedFilename(m_workspace.ActivePath());
 #endif
 }
 
 void MainFrame::UpdateChart()
 {
-    if (!m_doc.Current())
+    if (!Doc().Current())
     {
         m_chart->SetHeading(wxEmptyString, wxEmptyString);
         m_chart->SetLegend(wxEmptyString, wxEmptyString);
         m_chart->SetDefaultStatus(wxEmptyString);
-        if (m_path.empty())
+        if (m_workspace.ActivePath().empty())
             m_chart->ShowMessage("Open a PHD2 guide log", wxString::FromUTF8("Choose File › Open, or drag a log file here"));
         else
             m_chart->ShowMessage("This log has no calibrations or guiding");
@@ -953,7 +992,7 @@ void MainFrame::UpdateChart()
     }
 
     m_chart->SetHeading(Heading(), wxEmptyString);
-    if (m_doc.CalibrationSection())
+    if (Doc().CalibrationSection())
     {
         m_chart->SetHeading(Heading(), "Camera pixels from the start");
         m_chart->SetLegend("West", "North");
@@ -972,13 +1011,13 @@ void MainFrame::UpdateChart()
     m_chart->SetLegend(radec ? "RA" : "dx", radec ? "Dec" : "dy");
     if (m_settings.view == ChartKind::Scatter)
     {
-        const GuideSession *s = m_doc.Session();
-        size_t frames = m_doc.Selection() ? m_doc.Selection()->last - m_doc.Selection()->first + 1 : s->entries.size();
+        const GuideSession *s = Doc().Session();
+        size_t frames = Doc().Selection() ? Doc().Selection()->last - Doc().Selection()->first + 1 : s->entries.size();
         m_chart->SetHeading(Heading(),
                             wxString::FromUTF8(std::string(radec ? "RA against Dec" : "dx against dy") +
-                                               (m_doc.Selection() ? " \u00b7 selected frames" : " \u00b7 whole session")));
+                                               (Doc().Selection() ? " \u00b7 selected frames" : " \u00b7 whole session")));
         m_chart->SetLegend(wxEmptyString, wxEmptyString);
-        m_chart->SetDefaultStatus(wxString::FromUTF8(Summarize(m_doc.Stats(), frames, s->pixelScale,
+        m_chart->SetDefaultStatus(wxString::FromUTF8(Summarize(Doc().Stats(), frames, s->pixelScale,
                                                                 m_settings.display.units).frames +
                                                       (radec ? " \u00b7 the ellipse spans two standard deviations" : "")));
         m_chart->ShowScatter();
@@ -1038,7 +1077,7 @@ void MainFrame::SaveLayout()
         m_settings.inspectorWidth = ToDIP(m_inner->GetSize().x - m_inner->GetSashPosition());
     m_settings.sidebarShown = m_outer->IsSplit();
     m_settings.inspectorShown = m_inner->IsSplit();
-    m_settings.verticalLock = m_doc.VerticalLock();
+    m_settings.verticalLock = Doc().VerticalLock();
 
     if (!IsFullScreen())
     {
