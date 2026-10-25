@@ -4,6 +4,7 @@ All notable changes to OpenAstro Guide Insight, and to PHD2 Log Viewer before it
 
 ## Unreleased
 
+- Keep multiple guide logs open in a collapsible Sessions tree; open adds logs, and Close Log removes one
 - Renamed from PHD2 Log Viewer; settings carry over
 - New app icon: RA and Dec guide traces settling into the OpenAstro logo
 - New window: a sidebar of sessions, the chart, and an inspector of statistics, session details, display, analysis and exclusion options

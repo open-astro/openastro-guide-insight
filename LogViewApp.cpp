@@ -68,8 +68,8 @@ bool LogViewApp::OnInit()
     m_frame = new MainFrame();
     m_frame->Show();
 
-    if (!m_openFile.IsEmpty())
-        m_frame->Open(m_openFile);
+    for (const wxString& path : m_openFiles)
+        m_frame->Open(path);
 
     return true;
 }
@@ -77,16 +77,14 @@ bool LogViewApp::OnInit()
 void LogViewApp::OnInitCmdLine(wxCmdLineParser& parser)
 {
     parser.AddSwitch(wxEmptyString, "version", "Print the version and exit");
-    parser.AddParam("filename", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL);
+    parser.AddParam("filename", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE | wxCMD_LINE_PARAM_OPTIONAL);
 }
 
 bool LogViewApp::OnCmdLineParsed(wxCmdLineParser& parser)
 {
-    if (parser.GetParamCount() > 1)
-        return false;
     m_printVersion = parser.Found("version");
-    if (parser.GetParamCount() == 1)
-        m_openFile = parser.GetParam(0);
+    for (size_t i = 0; i < parser.GetParamCount(); i++)
+        m_openFiles.Add(parser.GetParam(i));
     return true;
 }
 
@@ -94,12 +92,12 @@ bool LogViewApp::OnCmdLineParsed(wxCmdLineParser& parser)
 // Files opened from the Finder, or dropped on the Dock icon.
 void LogViewApp::MacOpenFiles(const wxArrayString& files)
 {
-    if (files.empty())
-        return;
     if (m_frame)
-        m_frame->Open(files[0]);
+        for (const wxString& path : files)
+            m_frame->Open(path);
     else
-        m_openFile = files[0];
+        for (const wxString& path : files)
+            m_openFiles.Add(path);
 }
 #endif
 

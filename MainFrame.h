@@ -28,6 +28,7 @@
 #include "document.h"
 #include "nights.h"
 #include "theme.h"
+#include "workspace.h"
 
 #include <wx/filehistory.h>
 #include <wx/frame.h>
@@ -43,10 +44,9 @@ class wxSplitterWindow;
 
 class MainFrame : public wxFrame, public ChartHost
 {
-    Document m_doc;
+    Workspace m_workspace;
     AppSettings m_settings;
     Palette m_palette;
-    wxString m_path;
     wxFileHistory m_history;
     NightCache m_nights; // summaries of the logs beside the open one
     std::unique_ptr<wxPreferencesEditor> m_preferences;
@@ -87,6 +87,8 @@ class MainFrame : public wxFrame, public ChartHost
     void SetView(ChartKind view);
     void SelectSection(size_t section);
     void SelectSections(const std::vector<size_t>& sections);
+    void ActivateLog(size_t index);
+    void CloseLog(size_t index);
     // The heading over the chart: the section, or the combined sessions.
     wxString Heading() const;
     void ShowSidebar(bool show);
@@ -117,7 +119,8 @@ class MainFrame : public wxFrame, public ChartHost
 
 public:
     // ChartHost
-    Document& Doc() override { return m_doc; }
+    Document& Doc() override { return m_workspace.Active(); }
+    const Document& Doc() const { return m_workspace.Active(); }
     const AppSettings& Settings() const override { return m_settings; }
     const Palette& Colors() const override { return m_palette; }
     const GARun *Analysis() override;

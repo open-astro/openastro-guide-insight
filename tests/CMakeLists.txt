@@ -31,6 +31,8 @@ add_executable(guideinsight_tests
   test_assessment.cpp
   test_catalogue.cpp
   test_nights.cpp
+  test_sidebar.cpp
+  test_workspace.cpp
 )
 target_link_libraries(guideinsight_tests PRIVATE guideinsight_core Catch2::Catch2)
 guideinsight_warnings(guideinsight_tests)
